@@ -6,8 +6,10 @@ class Branch(models.Model):
     address = models.TextField()
     latitude = models.DecimalField(max_digits=9, decimal_places=6)
     longitude = models.DecimalField(max_digits=9, decimal_places=6)
-    phone = models.CharField(max_length=20, blank=True)
+    capacity = models.PositiveIntegerField(default=10)
     is_active = models.BooleanField(default=True)
+    opening_time = models.TimeField()
+    closing_time = models.TimeField()
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -15,21 +17,22 @@ class Branch(models.Model):
 
 
 class ServiceType(models.Model):
-    EXTERIOR = 'exterior'
-    INTERIOR = 'interior'
-    FULL = 'full'
+    AUTOMATIC = 'automatic'
+    TRADITIONAL = 'traditional'
+    MOBILE = 'mobile'
     CATEGORY_CHOICES = [
-        (EXTERIOR, 'Exterior'),
-        (INTERIOR, 'Interior'),
-        (FULL, 'Full Detail'),
+        (AUTOMATIC, 'Automatic'),
+        (TRADITIONAL, 'Traditional'),
+        (MOBILE, 'Mobile'),
     ]
 
     branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name='service_types')
     name = models.CharField(max_length=100)
-    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
+    description = models.TextField(blank=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)
     duration_minutes = models.PositiveIntegerField(default=30)
-    description = models.TextField(blank=True)
+    category = models.CharField(max_length=15, choices=CATEGORY_CHOICES)
+    is_available = models.BooleanField(default=True)
 
     def __str__(self):
-        return f'{self.name} — {self.branch.name}'
+        return f'{self.name} ({self.get_category_display()}) — {self.branch.name}'

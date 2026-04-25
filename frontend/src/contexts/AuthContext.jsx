@@ -1,37 +1,57 @@
-import { createContext, useContext, useState, useCallback } from 'react'
-import axios from 'axios'
+import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import client from '../api/client'
 
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem('user')) ?? null
-    } catch {
-      return null
-    }
-  })
+  const [user, setUser] = useState(null)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
-  const login = useCallback(async (phone, password) => {
-    const { data } = await axios.post('/api/token/', { phone, password })
-    localStorage.setItem('access_token', data.access)
-    localStorage.setItem('refresh_token', data.refresh)
-    const me = await axios.get('/api/accounts/me/', {
-      headers: { Authorization: `Bearer ${data.access}` },
-    })
-    localStorage.setItem('user', JSON.stringify(me.data))
-    setUser(me.data)
+  // ── Fetch profile from API and hydrate state ────────────────────────────────
+  const fetchProfile = useCallback(async () => {
+    try {
+      const { data } = await client.get('accounts/profile/')
+      setUser(data)
+      setIsAuthenticated(true)
+    } catch {
+      setUser(null)
+      setIsAuthenticated(false)
+      localStorage.removeItem('access_token')
+      localStorage.removeItem('refresh_token')
+    }
   }, [])
 
+  // ── On mount: restore session if token present ──────────────────────────────
+  useEffect(() => {
+    const token = localStorage.getItem('access_token')
+    if (token) {
+      fetchProfile().finally(() => setIsLoading(false))
+    } else {
+      setIsLoading(false)
+    }
+  }, [fetchProfile])
+
+  // ── login: verify OTP → store tokens → load profile ────────────────────────
+  const login = useCallback(async (phone, code) => {
+    const { data } = await client.post('accounts/otp/verify/', { phone, code })
+    localStorage.setItem('access_token', data.access)
+    localStorage.setItem('refresh_token', data.refresh)
+    setUser(data.user)
+    setIsAuthenticated(true)
+    return data.user
+  }, [])
+
+  // ── logout: wipe state and storage ─────────────────────────────────────────
   const logout = useCallback(() => {
     localStorage.removeItem('access_token')
     localStorage.removeItem('refresh_token')
-    localStorage.removeItem('user')
     setUser(null)
+    setIsAuthenticated(false)
   }, [])
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, isAuthenticated, isLoading, login, logout, fetchProfile }}>
       {children}
     </AuthContext.Provider>
   )
@@ -39,6 +59,6 @@ export function AuthProvider({ children }) {
 
 export function useAuth() {
   const ctx = useContext(AuthContext)
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider')
+  if (!ctx) throw new Error('useAuth must be used inside <AuthProvider>')
   return ctx
 }

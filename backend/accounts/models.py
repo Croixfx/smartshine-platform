@@ -1,5 +1,6 @@
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
+from django.utils import timezone
 
 
 class CustomUserManager(BaseUserManager):
@@ -32,10 +33,13 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
 
     phone = models.CharField(max_length=20, unique=True)
     full_name = models.CharField(max_length=150, blank=True)
+    email = models.EmailField(blank=True)
     role = models.CharField(max_length=10, choices=ROLE_CHOICES, default=CUSTOMER)
+    is_verified = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
-    date_joined = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     USERNAME_FIELD = 'phone'
     REQUIRED_FIELDS = []
@@ -44,3 +48,17 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return f'{self.phone} ({self.role})'
+
+
+class OTPCode(models.Model):
+    phone = models.CharField(max_length=20)
+    code = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_used = models.BooleanField(default=False)
+
+    def is_valid(self):
+        age = timezone.now() - self.created_at
+        return not self.is_used and age.total_seconds() < 600  # 10 minutes
+
+    def __str__(self):
+        return f'OTP {self.code} → {self.phone} (used={self.is_used})'
