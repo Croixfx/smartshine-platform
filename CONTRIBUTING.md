@@ -1,3 +1,34 @@
+### First Time Setup
+
+# Clone the repo
+git clone https://github.com/Croixfx/smartshine-platform.git
+cd smartshine-platform
+
+# Set your identity (use your GitHub email)
+git config user.name "YourGitHubUsername"
+git config user.email "your-github-email@example.com"
+
+### Every Time You Work
+
+# 1. Switch to develop and sync
+git checkout develop
+git pull origin develop
+
+# 2. Create your feature branch
+git checkout -b feature/yourname-taskname
+# Example: feature/alice-login-screen
+
+# 3. Do your work, then commit
+git add .
+git commit -m "feat: what you built"
+
+# 4. Push your branch
+git push origin feature/yourname-taskname
+
+# 5. Go to GitHub → Open Pull Request → base: develop
+
+
+
 # Contributing to SmartShine
 
 ## Branch Workflow
