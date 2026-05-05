@@ -3,39 +3,46 @@ from .models import Booking
 
 
 class BookingSerializer(serializers.ModelSerializer):
-    """Read serializer — nested names for display."""
     customer_phone = serializers.CharField(source='customer.phone', read_only=True)
+    customer_name = serializers.CharField(source='customer.full_name', read_only=True)
     branch_name = serializers.CharField(source='branch.name', read_only=True)
     service_name = serializers.CharField(source='service.name', read_only=True)
     service_price = serializers.DecimalField(source='service.price', max_digits=10, decimal_places=2, read_only=True)
     vehicle_plate = serializers.CharField(source='vehicle.plate_number', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     payment_status_display = serializers.CharField(source='get_payment_status_display', read_only=True)
+    assigned_worker_name = serializers.CharField(source='assigned_worker.full_name', read_only=True, default=None)
+    assigned_worker_phone = serializers.CharField(source='assigned_worker.phone', read_only=True, default=None)
+    assigned_driver_name = serializers.CharField(source='assigned_driver.full_name', read_only=True, default=None)
+    assigned_driver_phone = serializers.CharField(source='assigned_driver.phone', read_only=True, default=None)
 
     class Meta:
         model = Booking
         fields = [
-            'id', 'customer', 'customer_phone',
+            'id', 'booking_ref',
+            'customer', 'customer_phone', 'customer_name',
             'branch', 'branch_name',
             'service', 'service_name', 'service_price',
             'vehicle', 'vehicle_plate',
             'date', 'time_slot',
             'status', 'status_display',
             'payment_status', 'payment_status_display',
+            'assigned_worker', 'assigned_worker_name', 'assigned_worker_phone',
+            'assigned_driver', 'assigned_driver_name', 'assigned_driver_phone',
             'pickup_requested', 'pickup_address', 'pickup_latitude', 'pickup_longitude',
             'notes', 'created_at', 'updated_at',
         ]
         read_only_fields = [
-            'id', 'customer', 'customer_phone',
+            'id', 'booking_ref', 'customer', 'customer_phone', 'customer_name',
             'branch_name', 'service_name', 'service_price', 'vehicle_plate',
             'status', 'status_display', 'payment_status', 'payment_status_display',
+            'assigned_worker_name', 'assigned_worker_phone',
+            'assigned_driver_name', 'assigned_driver_phone',
             'created_at', 'updated_at',
         ]
 
 
 class BookingCreateSerializer(serializers.ModelSerializer):
-    """Write serializer — accepts IDs, validates time slot availability."""
-
     class Meta:
         model = Booking
         fields = [
@@ -51,12 +58,9 @@ class BookingCreateSerializer(serializers.ModelSerializer):
         time_slot = attrs.get('time_slot')
 
         conflict_qs = Booking.objects.filter(
-            branch=branch,
-            date=date,
-            time_slot=time_slot,
+            branch=branch, date=date, time_slot=time_slot,
         ).exclude(status=Booking.CANCELLED)
 
-        # On update, exclude the current instance
         if self.instance:
             conflict_qs = conflict_qs.exclude(pk=self.instance.pk)
 

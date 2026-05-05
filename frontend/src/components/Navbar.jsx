@@ -1,102 +1,134 @@
-import { useState } from 'react'
-import { Link, NavLink, useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
 const NAV_LINKS = {
-  customer: [{ to: '/', label: 'Home' }, { to: '/bookings', label: 'My Bookings' }, { to: '/vehicles', label: 'My Vehicles' }],
-  worker:   [{ to: '/worker', label: 'Dashboard' }],
-  driver:   [{ to: '/driver', label: 'Dashboard' }],
-  admin:    [{ to: '/admin', label: 'Dashboard' }, { to: '/admin/branches', label: 'Branches' }, { to: '/admin/bookings', label: 'Bookings' }],
+  customer: [
+    { to: '/dashboard', label: 'Home' },
+    { to: '/bookings', label: 'My Bookings' },
+    { to: '/vehicles', label: 'My Vehicles' },
+  ],
+  worker: [{ to: '/worker', label: 'Dashboard' }],
+  driver: [{ to: '/driver', label: 'Dashboard' }],
+  admin: [
+    { to: '/admin', label: 'Overview' },
+    { to: '/admin/branches', label: 'Branches' },
+    { to: '/admin/bookings', label: 'Bookings' },
+    { to: '/admin/users', label: 'Users' },
+  ],
 }
 
 export default function Navbar() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [open, setOpen] = useState(false)
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 640)
 
-  const links = NAV_LINKS[user?.role] ?? []
+  useEffect(() => {
+    const h = () => setIsMobile(window.innerWidth < 640)
+    window.addEventListener('resize', h)
+    return () => window.removeEventListener('resize', h)
+  }, [])
 
-  const handleLogout = () => {
-    logout()
-    navigate('/login')
+  const links = NAV_LINKS[user?.role] ?? NAV_LINKS.customer
+  const handleLogout = () => { logout(); navigate('/login') }
+  const isActive = (to) => {
+    if (to === '/admin') return location.pathname === '/admin'
+    return location.pathname.startsWith(to)
   }
 
-  const linkClass = ({ isActive }) =>
-    `text-sm font-medium transition-colors ${isActive ? 'text-white' : 'text-blue-200 hover:text-white'}`
-
   return (
-    <nav className="bg-blue-700 shadow-md sticky top-0 z-50">
-      <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-        {/* Logo */}
-        <Link to="/" className="text-white font-extrabold text-xl tracking-tight">
-          SmartShine
-        </Link>
+    <div>
+      <nav style={{
+        background: '#1A5276', height: 64, display: 'flex', alignItems: 'center',
+        padding: '0 24px', justifyContent: 'space-between', position: 'sticky',
+        top: 0, zIndex: 50, boxShadow: '0 1px 0 rgba(0,0,0,0.1)',
+      }}>
+        <span
+          onClick={() => navigate(user?.role === 'admin' ? '/admin' : '/dashboard')}
+          style={{
+            fontFamily: "'Playfair Display',serif", fontWeight: 700,
+            fontSize: 20, color: 'white', letterSpacing: '-0.02em',
+            cursor: 'pointer',
+          }}
+        >
+          Smart<span style={{ color: '#F39C12' }}>Shine</span>
+        </span>
 
-        {/* Desktop links */}
-        <div className="hidden md:flex items-center gap-6">
-          {links.map((l) => (
-            <NavLink key={l.to} to={l.to} end={l.to === '/'} className={linkClass}>
-              {l.label}
-            </NavLink>
-          ))}
-        </div>
+        {!isMobile && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+            {links.map(l => (
+              <button
+                key={l.to}
+                onClick={() => navigate(l.to)}
+                style={{
+                  fontSize: 13, fontWeight: isActive(l.to) ? 600 : 500, cursor: 'pointer',
+                  color: isActive(l.to) ? 'white' : 'rgba(255,255,255,0.65)',
+                  transition: 'color 150ms', background: 'none',
+                  border: 'none', fontFamily: "'DM Sans',sans-serif",
+                  borderBottom: isActive(l.to) ? '2px solid #F39C12' : '2px solid transparent',
+                  paddingBottom: 2,
+                }}
+              >
+                {l.label}
+              </button>
+            ))}
+          </div>
+        )}
 
-        {/* Desktop right */}
-        <div className="hidden md:flex items-center gap-4">
-          <span className="text-blue-200 text-sm">{user?.full_name || user?.phone}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {!isMobile && (
+            <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)' }}>
+              {user?.full_name || user?.phone}
+            </span>
+          )}
           <button
             onClick={handleLogout}
-            className="bg-white text-blue-700 text-sm font-semibold px-4 py-1.5 rounded-lg hover:bg-blue-50 transition-colors"
+            style={{
+              background: 'white', color: '#1A5276', fontSize: 13, fontWeight: 600,
+              padding: '6px 16px', borderRadius: 10, border: 'none', cursor: 'pointer',
+              fontFamily: "'DM Sans',sans-serif",
+            }}
           >
             Logout
           </button>
-        </div>
-
-        {/* Mobile hamburger */}
-        <button
-          className="md:hidden text-white focus:outline-none"
-          onClick={() => setOpen((o) => !o)}
-          aria-label="Toggle menu"
-        >
-          {open ? (
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          ) : (
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
+          {isMobile && (
+            <button
+              onClick={() => setOpen(o => !o)}
+              style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', padding: 4 }}
+            >
+              <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                {open
+                  ? <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  : <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />}
+              </svg>
+            </button>
           )}
-        </button>
-      </div>
+        </div>
+      </nav>
 
-      {/* Mobile menu */}
-      {open && (
-        <div className="md:hidden bg-blue-800 px-4 pb-4 space-y-2">
-          {links.map((l) => (
-            <NavLink
+      {open && isMobile && (
+        <div style={{
+          background: '#154360', padding: '12px 24px 16px', display: 'flex',
+          flexDirection: 'column', gap: 8,
+        }}>
+          {links.map(l => (
+            <button
               key={l.to}
-              to={l.to}
-              end={l.to === '/'}
-              onClick={() => setOpen(false)}
-              className={({ isActive }) =>
-                `block py-2 text-sm font-medium ${isActive ? 'text-white' : 'text-blue-200 hover:text-white'}`
-              }
+              onClick={() => { navigate(l.to); setOpen(false) }}
+              style={{
+                fontSize: 14, fontWeight: 500, padding: '8px 0',
+                color: isActive(l.to) ? 'white' : 'rgba(255,255,255,0.65)',
+                cursor: 'pointer', background: 'none', border: 'none',
+                fontFamily: "'DM Sans',sans-serif", textAlign: 'left',
+              }}
             >
               {l.label}
-            </NavLink>
-          ))}
-          <div className="pt-2 border-t border-blue-600">
-            <p className="text-blue-300 text-xs mb-2">{user?.full_name || user?.phone}</p>
-            <button
-              onClick={handleLogout}
-              className="w-full bg-white text-blue-700 text-sm font-semibold px-4 py-2 rounded-lg hover:bg-blue-50"
-            >
-              Logout
             </button>
-          </div>
+          ))}
         </div>
       )}
-    </nav>
+    </div>
   )
 }

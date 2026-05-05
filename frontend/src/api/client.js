@@ -5,37 +5,66 @@ const client = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
-// ── Request: attach access token ─────────────────────��────────────────────────
+// ── Request: attach access token ──────────────────────────────────────────────
 client.interceptors.request.use((config) => {
-  const token = localStorage.getItem('access_token')
+  const token = localStorage.getItem('smartshine_access')
   if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
 
 // ── Response: silent token refresh on 401 ────────────────────────────────────
+let isRefreshing = false
+let failedQueue = []
+
+const processQueue = (error, token = null) => {
+  failedQueue.forEach((p) => (error ? p.reject(error) : p.resolve(token)))
+  failedQueue = []
+}
+
 client.interceptors.response.use(
   (response) => response,
   async (error) => {
     const original = error.config
+
     if (error.response?.status === 401 && !original._retry) {
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => failedQueue.push({ resolve, reject }))
+          .then((token) => {
+            original.headers.Authorization = `Bearer ${token}`
+            return client(original)
+          })
+          .catch((err) => Promise.reject(err))
+      }
+
       original._retry = true
-      try {
-        const refresh = localStorage.getItem('refresh_token')
-        if (!refresh) throw new Error('no refresh token')
-        // Use plain axios so this call doesn't trigger the interceptor again
-        const { data } = await axios.post(
-          'http://localhost:8000/api/token/refresh/',
-          { refresh }
-        )
-        localStorage.setItem('access_token', data.access)
-        original.headers.Authorization = `Bearer ${data.access}`
-        return client(original)
-      } catch {
-        localStorage.removeItem('access_token')
-        localStorage.removeItem('refresh_token')
+      isRefreshing = true
+
+      const refresh = localStorage.getItem('smartshine_refresh')
+      if (!refresh) {
+        isRefreshing = false
+        localStorage.removeItem('smartshine_access')
+        localStorage.removeItem('smartshine_refresh')
         window.location.href = '/login'
+        return Promise.reject(error)
+      }
+
+      try {
+        const { data } = await axios.post('http://localhost:8000/api/token/refresh/', { refresh })
+        localStorage.setItem('smartshine_access', data.access)
+        original.headers.Authorization = `Bearer ${data.access}`
+        processQueue(null, data.access)
+        return client(original)
+      } catch (err) {
+        processQueue(err, null)
+        localStorage.removeItem('smartshine_access')
+        localStorage.removeItem('smartshine_refresh')
+        window.location.href = '/login'
+        return Promise.reject(err)
+      } finally {
+        isRefreshing = false
       }
     }
+
     return Promise.reject(error)
   }
 )

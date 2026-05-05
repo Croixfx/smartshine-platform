@@ -1,0 +1,1169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SmartShine — Customer App</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; font-family: 'DM Sans', system-ui, sans-serif; background: #F8F9FA; min-height: 100vh; }
+  #root { min-height: 100vh; display: flex; flex-direction: column; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="Navbar.jsx"></script>
+<script type="text/babel" src="Footer.jsx"></script>
+<script type="text/babel" src="BranchCard.jsx"></script>
+<script type="text/babel" src="ServiceCard.jsx"></script>
+<script type="text/babel" src="BookingRow.jsx"></script>
+<script type="text/babel" src="VehicleCard.jsx"></script>
+<script type="text/babel">
+const BRANCHES = [
+  { id:1, name:'Kigali Centre Branch', address:'KN 4 Ave, Nyarugenge, Kigali', opening_time:'08:00', closing_time:'18:00', is_active:true, capacity:10 },
+  { id:2, name:'Remera Branch', address:'KG 11 Ave, Gasabo, Kigali', opening_time:'07:00', closing_time:'20:00', is_active:true, capacity:8 },
+  { id:3, name:'Kicukiro Branch', address:'KK 15 Rd, Kicukiro, Kigali', opening_time:'08:00', closing_time:'17:00', is_active:false, capacity:6 },
+  { id:4, name:'Nyamirambo Branch', address:'KN 78 St, Nyamirambo, Kigali', opening_time:'08:00', closing_time:'18:00', is_active:true, capacity:12 },
+  { id:5, name:'Gisozi Branch', address:'KG 501 St, Gasabo, Kigali', opening_time:'09:00', closing_time:'19:00', is_active:true, capacity:7 },
+];
+const SERVICES = [
+  { id:1, name:'Full Body Wash', category:'automatic', category_display:'Automatic', description:'Complete exterior and interior clean with vacuum and wax polish.', duration_minutes:45, price:8000, is_available:true },
+  { id:2, name:'Quick Exterior Rinse', category:'traditional', category_display:'Traditional', description:'Fast hand wash and dry — exterior only.', duration_minutes:20, price:3000, is_available:true },
+  { id:3, name:'Premium Detail', category:'automatic', category_display:'Automatic', description:'Full interior detail, clay bar treatment, and ceramic spray.', duration_minutes:90, price:18000, is_available:true },
+  { id:4, name:'Mobile Wash', category:'mobile', category_display:'Mobile', description:'We come to you — available within 5 km of branch.', duration_minutes:60, price:12000, is_available:false },
+  { id:5, name:'Tyre & Rim Clean', category:'traditional', category_display:'Traditional', description:'Deep clean of tyres and alloy rims.', duration_minutes:25, price:4000, is_available:true },
+];
+const BOOKINGS = [
+  { id:42, branch_name:'Remera Branch', service_name:'Full Body Wash', scheduled_at:'2025-05-03T10:30:00', status:'confirmed' },
+  { id:41, branch_name:'Kigali Centre Branch', service_name:'Quick Exterior Rinse', scheduled_at:'2025-04-28T14:00:00', status:'completed' },
+  { id:39, branch_name:'Kicukiro Branch', service_name:'Premium Detail', scheduled_at:'2025-04-15T09:00:00', status:'completed' },
+  { id:35, branch_name:'Remera Branch', service_name:'Tyre & Rim Clean', scheduled_at:'2025-04-02T11:00:00', status:'cancelled' },
+  { id:28, branch_name:'Kigali Centre Branch', service_name:'Mobile Wash', scheduled_at:'2025-03-20T16:00:00', status:'in_progress' },
+];
+const VEHICLES = [
+  { id:1, plate_number:'RAC 123 A', make:'Toyota', model:'Corolla', vehicle_type:'Sedan', color:'White' },
+  { id:2, plate_number:'RAB 456 B', make:'Honda', model:'CR-V', vehicle_type:'SUV', color:'Silver' },
+  { id:3, plate_number:'RAD 789 C', make:'Kia', model:'Sportage', vehicle_type:'SUV', color:'Black' },
+];
+
+const PAGE_WRAP = { flex:1, display:'flex', flexDirection:'column' };
+const MAIN = { maxWidth:'1100px', width:'100%', margin:'0 auto', padding:'32px 20px', flex:1 };
+const PAGE_TITLE = { fontFamily:"'DM Sans',sans-serif", fontSize:'22px', fontWeight:700, color:'#1a1a2e', marginBottom:'20px' };
+const HERO_WRAP = { background:'#1A5276', color:'white', padding:'36px 24px', textAlign:'center' };
+const HERO_H = { fontFamily:"'Playfair Display',serif", fontSize:'32px', fontWeight:700, marginBottom:'6px', margin:'0 0 6px' };
+
+function MapPlaceholder({ branches, onSelect }) {
+  const pins = [[200,130],[450,90],[550,200],[160,220],[340,60]];
+  return (
+    <div style={{ borderRadius:'16px', overflow:'hidden', boxShadow:'0 2px 12px rgba(0,0,0,.06)', height:'280px', background:'#d4e9f0', position:'relative' }}>
+      <svg width="100%" height="100%" viewBox="0 0 800 280" preserveAspectRatio="xMidYMid slice" style={{ position:'absolute', top:0, left:0 }}>
+        <rect width="800" height="280" fill="#d4e9f0"/>
+        <line x1="0" y1="140" x2="800" y2="140" stroke="#c0d8e4" strokeWidth="12"/>
+        <line x1="400" y1="0" x2="400" y2="280" stroke="#c0d8e4" strokeWidth="10"/>
+        <line x1="0" y1="70" x2="800" y2="210" stroke="#c0d8e4" strokeWidth="6"/>
+        <line x1="0" y1="140" x2="800" y2="140" stroke="white" strokeWidth="1.5" strokeDasharray="20,15"/>
+        <line x1="400" y1="0" x2="400" y2="280" stroke="white" strokeWidth="1.5" strokeDasharray="20,15"/>
+        <circle cx="150" cy="70" r="50" fill="#b8d9b0" opacity=".5"/>
+        <circle cx="620" cy="190" r="40" fill="#b8d9b0" opacity=".5"/>
+        <rect x="50" y="170" width="90" height="60" rx="8" fill="#c8dde5" opacity=".5"/>
+        <rect x="660" y="40" width="80" height="55" rx="8" fill="#c8dde5" opacity=".5"/>
+        {branches.map((b,i) => {
+          const [px,py] = pins[i] || [400,140];
+          return (
+            <g key={b.id} onClick={() => onSelect(b)} style={{ cursor:'pointer' }}>
+              <circle cx={px} cy={py} r="26" fill={b.is_active ? '#1A5276' : '#9ca3af'} opacity=".12"/>
+              <circle cx={px} cy={py} r="14" fill={b.is_active ? '#1A5276' : '#9ca3af'}/>
+              <circle cx={px} cy={py} r="6" fill="white"/>
+            </g>
+          );
+        })}
+      </svg>
+      <div style={{ position:'absolute', top:10, left:10, background:'white', borderRadius:'8px', padding:'8px 12px', boxShadow:'0 2px 8px rgba(0,0,0,.08)', fontSize:'11px', color:'#555', display:'flex', flexDirection:'column', gap:'4px' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:'6px' }}><div style={{ width:9, height:9, borderRadius:'50%', background:'#1A5276' }}></div>Open</div>
+        <div style={{ display:'flex', alignItems:'center', gap:'6px' }}><div style={{ width:9, height:9, borderRadius:'50%', background:'#9ca3af' }}></div>Closed</div>
+      </div>
+      <div style={{ position:'absolute', bottom:6, right:8, fontSize:'9px', color:'#888', background:'rgba(255,255,255,.75)', padding:'2px 6px', borderRadius:'4px' }}>Map · Kigali, Rwanda</div>
+    </div>
+  );
+}
+
+// ── Shared auth layout: split panel left + form right ─────────────────────────
+function AuthShell({ children }) {
+  return (
+    <div style={{ minHeight:'100vh', display:'flex' }}>
+      {/* Left brand panel */}
+      <div style={{ width:'45%', background:'linear-gradient(160deg,#0B2740 0%,#1A5276 55%,#2E86C1 100%)', display:'flex', flexDirection:'column', justifyContent:'space-between', padding:'48px 40px', flexShrink:0 }}>
+        <div>
+          <div style={{ fontFamily:"'Playfair Display',serif", fontSize:32, fontWeight:700, color:'white', letterSpacing:'-0.02em' }}>
+            Smart<span style={{ color:'#F39C12' }}>Shine</span>
+          </div>
+          <div style={{ fontSize:13, color:'rgba(255,255,255,.5)', marginTop:4, letterSpacing:'.08em', textTransform:'uppercase' }}>Premium Car Wash · Kigali</div>
+        </div>
+        <div>
+          <div style={{ fontFamily:"'Playfair Display',serif", fontSize:28, fontWeight:700, color:'white', lineHeight:1.25, marginBottom:32, maxWidth:280 }}>
+            Your car,<br/>always spotless.
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:16, marginBottom:40 }}>
+            {[['Convenient booking','Book from your phone in under 2 minutes'],['MoMo payments','Pay with MTN Mobile Money — no cash needed'],['Multiple locations','5 branches across Kigali, open 7 days']].map(([title,desc])=>(
+              <div key={title} style={{ display:'flex', alignItems:'flex-start', gap:12 }}>
+                <div style={{ width:20, height:20, borderRadius:'50%', background:'rgba(243,156,18,.25)', border:'1.5px solid #F39C12', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginTop:1 }}>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#F39C12" strokeWidth="3" strokeLinecap="round"><path d="M20 6L9 17l-5-5"/></svg>
+                </div>
+                <div>
+                  <div style={{ fontSize:13, fontWeight:600, color:'white' }}>{title}</div>
+                  <div style={{ fontSize:12, color:'rgba(255,255,255,.55)', marginTop:1 }}>{desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{ display:'flex', gap:24 }}>
+            {[['500+','Cars washed'],['4.8★','Rating'],['5','Locations']].map(([val,label])=>(
+              <div key={label}>
+                <div style={{ fontFamily:"'Playfair Display',serif", fontSize:22, fontWeight:700, color:'#F39C12' }}>{val}</div>
+                <div style={{ fontSize:11, color:'rgba(255,255,255,.5)', marginTop:1 }}>{label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={{ fontSize:11, color:'rgba(255,255,255,.3)' }}>© 2025 SmartShine · Kigali, Rwanda</div>
+      </div>
+      {/* Right form panel */}
+      <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', padding:'48px 40px', background:'#F8F9FA', overflowY:'auto' }}>
+        <div style={{ width:'100%', maxWidth:400 }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// ── Login ─────────────────────────────────────────────────────────────────────
+function LoginPage({ onLogin, setAuthPage }) {
+  const [step, setStep] = React.useState(1); // 1=phone, 2=otp
+  const [phone, setPhone] = React.useState('');
+  const [digits, setDigits] = React.useState(['','','','','','']);
+  const [showPwd, setShowPwd] = React.useState(false);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState('');
+  const [seconds, setSeconds] = React.useState(120);
+  const otpRefs = React.useRef([]);
+
+  React.useEffect(()=>{
+    if(step!==2) return;
+    setSeconds(120);
+    const t = setInterval(()=>setSeconds(s=>s>0?s-1:0), 1000);
+    return ()=>clearInterval(t);
+  },[step]);
+
+  const inp = (err) => ({ width:'100%', background:'white', border:`1.5px solid ${err?'#DC2626':'#E9ECEF'}`, borderRadius:10, padding:'11px 14px', fontSize:14, fontFamily:"'DM Sans',sans-serif", color:'#1a1a2e', outline:'none' });
+  const primaryBtn = (dis) => ({ width:'100%', background: dis ? '#CBD5E1' : '#F39C12', color: dis ? '#94A3B8' : '#1a1a2e', fontSize:15, fontWeight:700, padding:'13px', borderRadius:12, border:'none', cursor: dis ? 'not-allowed' : 'pointer', fontFamily:"'DM Sans',sans-serif", boxShadow: dis ? 'none' : '0 4px 16px rgba(243,156,18,.25)', transition:'all 150ms' });
+
+  const submitPhone = (e) => {
+    e.preventDefault(); setError('');
+    // Accept both "0782693724" (with leading 0) and "782693724" (without, as typed after +250 prefix)
+    if (!phone.match(/^0?7\d{8}$/)) { setError('Enter a valid Rwandan phone (e.g. 782693724)'); return; }
+    setLoading(true); setTimeout(()=>{ setLoading(false); setStep(2); }, 900);
+  };
+
+  const handleDigit = (i, val) => {
+    const clean = val.replace(/\D/g,'').slice(-1);
+    const next = [...digits]; next[i] = clean; setDigits(next);
+    if(clean && i<5) otpRefs.current[i+1]?.focus();
+    if(!clean && i>0) otpRefs.current[i-1]?.focus();
+  };
+  const handleDigitKey = (i, e) => {
+    if(e.key==='Backspace' && !digits[i] && i>0) { otpRefs.current[i-1]?.focus(); }
+  };
+
+  const code = digits.join('');
+  const submitOTP = (e) => {
+    e.preventDefault(); setError('');
+    setLoading(true);
+    setTimeout(()=>{
+      setLoading(false);
+      if(code==='123456'){ onLogin(); } else { setError('Invalid OTP. Use 123456 for this demo.'); }
+    }, 900);
+  };
+
+  const mm = String(Math.floor(seconds/60)).padStart(2,'0');
+  const ss = String(seconds%60).padStart(2,'0');
+
+  return (
+    <AuthShell>
+      <div style={{ fontFamily:"'Playfair Display',serif", fontSize:28, fontWeight:700, color:'#1a1a2e', marginBottom:4 }}>
+        {step===1 ? 'Welcome back' : 'Verify your phone'}
+      </div>
+      <div style={{ fontSize:14, color:'#888', marginBottom:32 }}>
+        {step===1 ? 'Sign in to your SmartShine account' : `We sent a code to +250 ${phone.slice(1)}`}
+      </div>
+
+      {/* Step dots */}
+      <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:28 }}>
+        {[1,2].map((s,i)=>(
+          <React.Fragment key={s}>
+            <div style={{ width:26, height:26, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, background:step>=s?'#1A5276':'#E9ECEF', color:step>=s?'white':'#aaa', transition:'all 200ms' }}>
+              {step>s ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round"><path d="M20 6L9 17l-5-5"/></svg> : s}
+            </div>
+            {i<1&&<div style={{ flex:1, height:2, background:step>=2?'#1A5276':'#E9ECEF', transition:'background 200ms' }}></div>}
+          </React.Fragment>
+        ))}
+      </div>
+
+      {error && <div style={{ background:'#FEE2E2', border:'1px solid #FECACA', color:'#B91C1C', fontSize:13, borderRadius:10, padding:'10px 14px', marginBottom:16 }}>{error}</div>}
+
+      {step===1 ? (
+        <form onSubmit={submitPhone} style={{ display:'flex', flexDirection:'column', gap:16 }}>
+          <div>
+            <label style={{ fontSize:13, fontWeight:500, color:'#1a1a2e', display:'block', marginBottom:6 }}>Phone Number</label>
+            <div style={{ display:'flex', gap:0 }}>
+              <div style={{ background:'white', border:'1.5px solid #E9ECEF', borderRight:'none', borderRadius:'10px 0 0 10px', padding:'11px 12px', display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
+                <span style={{ fontSize:16 }}>🇷🇼</span>
+                <span style={{ fontSize:14, fontWeight:600, color:'#1a1a2e' }}>+250</span>
+              </div>
+              <input type="tel" value={phone} onChange={e=>setPhone(e.target.value)} placeholder="782693724"
+                style={{ ...inp(!!error), borderRadius:'0 10px 10px 0', flex:1 }} required autoFocus />
+            </div>
+          </div>
+          <div>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6 }}>
+              <label style={{ fontSize:13, fontWeight:500, color:'#1a1a2e' }}>Password <span style={{ fontSize:11, color:'#888', fontWeight:400 }}>(optional)</span></label>
+            </div>
+            <div style={{ position:'relative' }}>
+              <input type={showPwd?'text':'password'} placeholder="••••••••"
+                style={{ ...inp(false), paddingRight:44 }} />
+              <button type="button" onClick={()=>setShowPwd(v=>!v)} style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:'#888', padding:0 }}>
+                {showPwd ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                  : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>}
+              </button>
+            </div>
+          </div>
+          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+            <div style={{ flex:1, height:1, background:'#E9ECEF' }}></div>
+            <span style={{ fontSize:12, color:'#aaa' }}>or sign in with OTP</span>
+            <div style={{ flex:1, height:1, background:'#E9ECEF' }}></div>
+          </div>
+          <button type="submit" style={primaryBtn(loading)} disabled={loading}>
+            {loading ? 'Sending OTP…' : 'Send OTP →'}
+          </button>
+          <p style={{ textAlign:'center', fontSize:13, color:'#888', margin:0 }}>
+            No account?{' '}
+            <span onClick={()=>setAuthPage('register')} style={{ color:'#2E86C1', cursor:'pointer', fontWeight:600 }}>Create one →</span>
+          </p>
+        </form>
+      ) : (
+        <form onSubmit={submitOTP} style={{ display:'flex', flexDirection:'column', gap:20 }}>
+          <div>
+            <p style={{ fontSize:13, color:'#555', margin:'0 0 16px' }}>
+              Code sent to <strong>+250 {phone.slice(1)}</strong>.{' '}
+              <button type="button" onClick={()=>{setStep(1);setDigits(['','','','','','']);setError('');}} style={{ color:'#2E86C1', background:'none', border:'none', cursor:'pointer', fontSize:13, fontFamily:"'DM Sans',sans-serif" }}>Change</button>
+            </p>
+            <label style={{ fontSize:13, fontWeight:500, color:'#1a1a2e', display:'block', marginBottom:10 }}>Enter 6-digit code</label>
+            {/* 6 individual boxes */}
+            <div style={{ display:'flex', gap:6 }}>
+              {digits.map((d,i)=>(
+                <input key={i} ref={el=>otpRefs.current[i]=el}
+                  type="text" inputMode="numeric" maxLength={1} value={d}
+                  onChange={e=>handleDigit(i,e.target.value)}
+                  onKeyDown={e=>handleDigitKey(i,e)}
+                  style={{ flex:'0 0 calc((100% - 30px) / 6)', width:0, minWidth:0, height:54, borderRadius:10, border:`2px solid ${d?'#2E86C1':'#E9ECEF'}`, background: d?'#EFF6FF':'white', fontSize:20, fontWeight:700, fontFamily:'monospace', textAlign:'center', color:'#1A5276', outline:'none', transition:'all 150ms' }}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Dev mode info box */}
+          <div style={{ background:'#FEF9EE', border:'1px solid #FDE68A', borderRadius:12, padding:'12px 14px', fontSize:12, color:'#92400E' }}>
+            <div style={{ fontWeight:700, marginBottom:3 }}>Development Mode</div>
+            <div>Check the Django terminal for the OTP, or use code <strong>123456</strong> in this prototype.</div>
+          </div>
+
+          {/* Countdown */}
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', fontSize:13 }}>
+            <span style={{ color: seconds>0 ? '#888' : '#2E86C1', cursor: seconds===0 ? 'pointer' : 'default' }}
+              onClick={()=>{ if(seconds===0){setDigits(['','','','','','']);setSeconds(120);} }}>
+              {seconds>0 ? `Resend in ${mm}:${ss}` : 'Resend OTP'}
+            </span>
+            <span style={{ color:'#888' }}>{code.length}/6 digits</span>
+          </div>
+
+          <button type="submit" style={primaryBtn(loading||code.length!==6)} disabled={loading||code.length!==6}>
+            {loading ? 'Verifying…' : 'Verify & Sign In'}
+          </button>
+        </form>
+      )}
+    </AuthShell>
+  );
+}
+
+// ── Registration ──────────────────────────────────────────────────────────────
+function RegisterPage({ setAuthPage, onLogin }) {
+  const [form, setForm] = React.useState({ fullName:'', phone:'', email:'', password:'' });
+  const [showPwd, setShowPwd] = React.useState(false);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState('');
+
+  const strength = (pwd) => {
+    let s = 0;
+    if(pwd.length>=8) s++;
+    if(/[A-Z]/.test(pwd)) s++;
+    if(/[0-9]/.test(pwd)) s++;
+    if(/[^A-Za-z0-9]/.test(pwd)) s++;
+    return s;
+  };
+  const pwdStrength = strength(form.password);
+  const strengthLabel = ['','Weak','Fair','Good','Strong'][pwdStrength];
+  const strengthColor = ['#E9ECEF','#DC2626','#F59E0B','#2E86C1','#22C55E'][pwdStrength];
+
+  const inp = { width:'100%', background:'white', border:'1.5px solid #E9ECEF', borderRadius:10, padding:'11px 14px', fontSize:14, fontFamily:"'DM Sans',sans-serif", color:'#1a1a2e', outline:'none' };
+
+  const handleSubmit = (e) => {
+    e.preventDefault(); setError('');
+    if(!form.fullName||!form.phone||!form.password) { setError('Please fill in all required fields'); return; }
+    if(!form.phone.match(/^0?7\d{8}$/)) { setError('Enter a valid Rwandan phone number (e.g. 782693724)'); return; }
+    if(form.password.length<6) { setError('Password must be at least 6 characters'); return; }
+    setLoading(true);
+    setTimeout(()=>{ setLoading(false); onLogin(); }, 1100);
+  };
+
+  return (
+    <AuthShell>
+      <div style={{ fontFamily:"'Playfair Display',serif", fontSize:28, fontWeight:700, color:'#1a1a2e', marginBottom:4 }}>Create account</div>
+      <div style={{ fontSize:14, color:'#888', marginBottom:32 }}>Join thousands of SmartShine customers in Kigali</div>
+
+      {error && <div style={{ background:'#FEE2E2', border:'1px solid #FECACA', color:'#B91C1C', fontSize:13, borderRadius:10, padding:'10px 14px', marginBottom:16 }}>{error}</div>}
+
+      <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:14 }}>
+        <div>
+          <label style={{ fontSize:13, fontWeight:500, color:'#1a1a2e', display:'block', marginBottom:6 }}>Full Name <span style={{ color:'#DC2626' }}>*</span></label>
+          <input value={form.fullName} onChange={e=>setForm(p=>({...p,fullName:e.target.value}))} placeholder="Jean de la Croix Niyonkuru" style={inp} required autoFocus />
+        </div>
+        <div>
+          <label style={{ fontSize:13, fontWeight:500, color:'#1a1a2e', display:'block', marginBottom:6 }}>Phone Number <span style={{ color:'#DC2626' }}>*</span></label>
+          <div style={{ display:'flex' }}>
+            <div style={{ background:'white', border:'1.5px solid #E9ECEF', borderRight:'none', borderRadius:'10px 0 0 10px', padding:'11px 12px', display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
+              <span style={{ fontSize:16 }}>🇷🇼</span>
+              <span style={{ fontSize:14, fontWeight:600, color:'#1a1a2e' }}>+250</span>
+            </div>
+            <input type="tel" value={form.phone} onChange={e=>setForm(p=>({...p,phone:e.target.value}))} placeholder="782693724"
+              style={{ ...inp, borderRadius:'0 10px 10px 0', flex:1 }} required />
+          </div>
+        </div>
+        <div>
+          <label style={{ fontSize:13, fontWeight:500, color:'#1a1a2e', display:'block', marginBottom:6 }}>Email <span style={{ fontSize:11, color:'#888', fontWeight:400 }}>(optional)</span></label>
+          <input type="email" value={form.email} onChange={e=>setForm(p=>({...p,email:e.target.value}))} placeholder="you@example.com" style={inp} />
+        </div>
+        <div>
+          <label style={{ fontSize:13, fontWeight:500, color:'#1a1a2e', display:'block', marginBottom:6 }}>Password <span style={{ color:'#DC2626' }}>*</span></label>
+          <div style={{ position:'relative' }}>
+            <input type={showPwd?'text':'password'} value={form.password} onChange={e=>setForm(p=>({...p,password:e.target.value}))} placeholder="Min. 6 characters"
+              style={{ ...inp, paddingRight:44 }} required />
+            <button type="button" onClick={()=>setShowPwd(v=>!v)} style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:'#888', padding:0 }}>
+              {showPwd ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>}
+            </button>
+          </div>
+          {form.password && (
+            <div style={{ marginTop:8 }}>
+              <div style={{ display:'flex', gap:4 }}>
+                {[1,2,3,4].map(i=>(
+                  <div key={i} style={{ flex:1, height:4, borderRadius:2, background: i<=pwdStrength ? strengthColor : '#E9ECEF', transition:'background 200ms' }}></div>
+                ))}
+              </div>
+              {strengthLabel && <div style={{ fontSize:11, color:strengthColor, marginTop:4, fontWeight:600 }}>{strengthLabel} password</div>}
+            </div>
+          )}
+        </div>
+
+        <button type="submit" style={{ width:'100%', background: loading?'#CBD5E1':'#F39C12', color: loading?'#94A3B8':'#1a1a2e', fontSize:15, fontWeight:700, padding:'13px', borderRadius:12, border:'none', cursor: loading?'not-allowed':'pointer', fontFamily:"'DM Sans',sans-serif", boxShadow: loading?'none':'0 4px 16px rgba(243,156,18,.25)', transition:'all 150ms', marginTop:4 }}>
+          {loading ? 'Creating account…' : 'Create Account →'}
+        </button>
+
+        <p style={{ textAlign:'center', fontSize:12, color:'#aaa', margin:0, lineHeight:1.5 }}>
+          By creating an account you agree to our{' '}
+          <span style={{ color:'#2E86C1', cursor:'pointer' }}>Terms of Service</span>{' '}and{' '}
+          <span style={{ color:'#2E86C1', cursor:'pointer' }}>Privacy Policy</span>.
+        </p>
+        <p style={{ textAlign:'center', fontSize:13, color:'#888', margin:0 }}>
+          Already have an account?{' '}
+          <span onClick={()=>setAuthPage('login')} style={{ color:'#2E86C1', cursor:'pointer', fontWeight:600 }}>Sign in</span>
+        </p>
+      </form>
+    </AuthShell>
+  );
+}
+
+function HomePage({ setPage, setSelectedBranch }) {
+  const [search, setSearch] = React.useState('');
+  const filtered = BRANCHES.filter(b => (b.name+b.address).toLowerCase().includes(search.toLowerCase()));
+  const handleSelect = (b) => { setSelectedBranch(b); setPage('branch'); };
+  return (
+    <div style={PAGE_WRAP}>
+      {/* Gradient hero */}
+      <div style={{ background:'linear-gradient(135deg,#0B2740 0%,#1A5276 60%,#2E86C1 100%)', padding:'56px 24px 64px', textAlign:'center', position:'relative', overflow:'hidden' }}>
+        <div style={{ position:'absolute', top:-60, right:-60, width:220, height:220, borderRadius:'50%', background:'rgba(243,156,18,.08)' }}></div>
+        <div style={{ position:'absolute', bottom:-40, left:-40, width:160, height:160, borderRadius:'50%', background:'rgba(255,255,255,.04)' }}></div>
+        <div style={{ position:'relative' }}>
+          <div style={{ display:'inline-block', background:'rgba(243,156,18,.15)', border:'1px solid rgba(243,156,18,.3)', borderRadius:20, padding:'4px 14px', fontSize:12, fontWeight:600, color:'#F39C12', letterSpacing:'.06em', textTransform:'uppercase', marginBottom:16 }}>Kigali's #1 Car Wash</div>
+          <div style={{ fontFamily:"'Playfair Display',serif", fontSize:40, fontWeight:800, color:'white', lineHeight:1.15, marginBottom:14, letterSpacing:'-0.02em' }}>
+            Find a Branch<br/><span style={{ color:'#F39C12' }}>Near You</span>
+          </div>
+          <p style={{ fontSize:15, color:'rgba(255,255,255,.7)', margin:'0 0 28px', maxWidth:480, marginLeft:'auto', marginRight:'auto' }}>
+            Premium car wash services across Kigali — book in 2 minutes, pay with MoMo.
+          </p>
+          <div style={{ display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap' }}>
+            <div style={{ background:'rgba(255,255,255,.1)', backdropFilter:'blur(8px)', borderRadius:10, padding:'8px 18px', fontSize:13, color:'white', display:'flex', alignItems:'center', gap:6 }}>
+              <span style={{ color:'#F39C12' }}>★</span> 4.8 rating
+            </div>
+            <div style={{ background:'rgba(255,255,255,.1)', backdropFilter:'blur(8px)', borderRadius:10, padding:'8px 18px', fontSize:13, color:'white' }}>
+              5 locations
+            </div>
+            <div style={{ background:'rgba(255,255,255,.1)', backdropFilter:'blur(8px)', borderRadius:10, padding:'8px 18px', fontSize:13, color:'white' }}>
+              Open 7 days
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style={MAIN}>
+        <MapPlaceholder branches={BRANCHES} onSelect={handleSelect} />
+
+        <div style={{ marginTop:32 }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16, flexWrap:'wrap', gap:10 }}>
+            <h3 style={{ ...PAGE_TITLE, margin:0 }}>All Branches</h3>
+            <input placeholder="Search branches…" value={search} onChange={e=>setSearch(e.target.value)}
+              style={{ background:'white', border:'1.5px solid #E9ECEF', borderRadius:'10px', padding:'8px 14px', fontSize:'13px', fontFamily:"'DM Sans',sans-serif", outline:'none', width:200, color:'#1a1a2e' }} />
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))', gap:14 }}>
+            {filtered.map(b => <BranchCard key={b.id} branch={b} onClick={()=>handleSelect(b)} />)}
+          </div>
+          {filtered.length===0 && <p style={{ color:'#aaa', fontSize:'14px' }}>No branches match your search.</p>}
+        </div>
+
+        {/* How it Works */}
+        <div style={{ marginTop:56 }}>
+          <h3 style={{ fontFamily:"'Playfair Display',serif", fontSize:26, fontWeight:700, color:'#1a1a2e', textAlign:'center', marginBottom:8 }}>How It Works</h3>
+          <p style={{ textAlign:'center', fontSize:14, color:'#888', marginBottom:32 }}>Book a car wash in 3 simple steps</p>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))', gap:20 }}>
+            {[
+              { n:'1', icon:'📍', title:'Find a Branch', desc:'Browse branches on the map or search by location. See hours, capacity, and services.' },
+              { n:'2', icon:'📅', title:'Book & Choose', desc:'Select your service, pick a time slot, and confirm your vehicle.' },
+              { n:'3', icon:'💳', title:'Pay with MoMo', desc:'Pay securely via MTN Mobile Money. Your booking is confirmed instantly.' },
+            ].map(s=>(
+              <div key={s.n} style={{ background:'white', borderRadius:16, boxShadow:'0 2px 12px rgba(0,0,0,.04)', padding:24, display:'flex', flexDirection:'column', gap:12 }}>
+                <div style={{ width:44, height:44, borderRadius:12, background:'#EFF6FF', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22 }}>{s.icon}</div>
+                <div style={{ fontFamily:"'DM Sans',sans-serif", fontSize:16, fontWeight:700, color:'#1a1a2e' }}>{s.title}</div>
+                <div style={{ fontSize:13, color:'#888', lineHeight:1.5 }}>{s.desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* CTA Banner */}
+        <div style={{ marginTop:48, marginBottom:16, background:'linear-gradient(135deg,#1A5276,#2E86C1)', borderRadius:20, padding:'36px 40px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:24, flexWrap:'wrap' }}>
+          <div>
+            <div style={{ fontFamily:"'Playfair Display',serif", fontSize:22, fontWeight:700, color:'white', marginBottom:6 }}>Ready for a spotless car?</div>
+            <div style={{ fontSize:14, color:'rgba(255,255,255,.7)' }}>Book your wash now — slots filling fast this weekend.</div>
+          </div>
+          <button onClick={()=>handleSelect(BRANCHES[0])} style={{ background:'#F39C12', color:'#1a1a2e', fontSize:14, fontWeight:700, padding:'13px 28px', borderRadius:12, border:'none', cursor:'pointer', fontFamily:"'DM Sans',sans-serif", boxShadow:'0 4px 16px rgba(243,156,18,.3)', flexShrink:0 }}>
+            Book Now →
+          </button>
+        </div>
+      </div>
+      <Footer />
+    </div>
+  );
+}
+
+function BranchDetailPage({ branch, setPage, setSelectedService }) {
+  const [activeTab, setActiveTab] = React.useState('all');
+  const handleBook = (svc) => { setSelectedService(svc); setPage('booking'); };
+
+  const TABS = [
+    { id:'all',        label:'All' },
+    { id:'automatic',  label:'Automatic' },
+    { id:'traditional',label:'Traditional' },
+    { id:'mobile',     label:'Mobile' },
+  ];
+  const filtered = activeTab==='all' ? SERVICES : SERVICES.filter(s=>s.category===activeTab);
+
+  return (
+    <div style={PAGE_WRAP}>
+      <div style={MAIN}>
+        <button onClick={()=>setPage('home')} style={{ display:'flex', alignItems:'center', gap:4, color:'#2E86C1', background:'none', border:'none', cursor:'pointer', fontSize:'13px', fontWeight:500, fontFamily:"'DM Sans',sans-serif", marginBottom:20, padding:0 }}>
+          ← All branches
+        </button>
+        <div style={{ background:'white', borderRadius:16, boxShadow:'0 2px 12px rgba(0,0,0,.04)', padding:24, marginBottom:16 }}>
+          <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:12, flexWrap:'wrap', marginBottom:8 }}>
+            <h2 style={{ fontFamily:"'Playfair Display',serif", fontSize:24, fontWeight:700, color:'#1a1a2e', margin:0 }}>{branch.name}</h2>
+            <span style={{ fontSize:13, fontWeight:600, padding:'4px 14px', borderRadius:9999, background: branch.is_active ? '#DCFCE7' : '#F3F4F6', color: branch.is_active ? '#15803D' : '#6B7280' }}>{branch.is_active ? 'Open' : 'Closed'}</span>
+          </div>
+          <p style={{ fontSize:14, color:'#888', marginBottom:12 }}>{branch.address}</p>
+          <div style={{ display:'flex', gap:20, fontSize:13, color:'#555', flexWrap:'wrap' }}>
+            <span>🕐 {branch.opening_time} – {branch.closing_time}</span>
+            <span>🚗 Capacity: {branch.capacity} vehicles</span>
+          </div>
+        </div>
+        <div style={{ borderRadius:16, overflow:'hidden', height:160, background:'#d4e9f0', marginBottom:24, position:'relative' }}>
+          <svg width="100%" height="100%" viewBox="0 0 600 160" preserveAspectRatio="xMidYMid slice">
+            <rect width="600" height="160" fill="#d4e9f0"/>
+            <line x1="0" y1="80" x2="600" y2="80" stroke="#c0d8e4" strokeWidth="14"/>
+            <line x1="300" y1="0" x2="300" y2="160" stroke="#c0d8e4" strokeWidth="10"/>
+            <line x1="0" y1="80" x2="600" y2="80" stroke="white" strokeWidth="1.5" strokeDasharray="20,15"/>
+            <circle cx="300" cy="80" r="20" fill="#1A5276" opacity=".9"/>
+            <circle cx="300" cy="80" r="8" fill="white"/>
+            <circle cx="300" cy="80" r="34" fill="#1A5276" opacity=".12"/>
+          </svg>
+          <div style={{ position:'absolute', bottom:6, right:8, fontSize:'9px', color:'#888', background:'rgba(255,255,255,.75)', padding:'2px 6px', borderRadius:4 }}>{branch.name}</div>
+        </div>
+
+        {/* Category tabs */}
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14, flexWrap:'wrap', gap:10 }}>
+          <h3 style={{ ...PAGE_TITLE, margin:0 }}>Available Services</h3>
+          <div style={{ display:'flex', gap:6 }}>
+            {TABS.map(t=>(
+              <button key={t.id} onClick={()=>setActiveTab(t.id)} style={{ fontSize:12, fontWeight:600, padding:'6px 14px', borderRadius:20, border:'none', cursor:'pointer', fontFamily:"'DM Sans',sans-serif", transition:'all 150ms',
+                background: activeTab===t.id ? '#1A5276' : 'white',
+                color: activeTab===t.id ? 'white' : '#888',
+                boxShadow: activeTab===t.id ? '0 2px 8px rgba(26,82,118,.2)' : '0 1px 4px rgba(0,0,0,.06)' }}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+          {filtered.map(svc => <ServiceCard key={svc.id} service={svc} onBook={handleBook} />)}
+          {filtered.length===0 && <p style={{ color:'#aaa', fontSize:14 }}>No services in this category.</p>}
+        </div>
+      </div>
+      <Footer />
+    </div>
+  );
+}
+
+const STATUS_STEPS = {
+  pending:     { steps:['Pending','Confirmed','In Progress','Completed'], current:0 },
+  confirmed:   { steps:['Pending','Confirmed','In Progress','Completed'], current:1 },
+  in_progress: { steps:['Pending','Confirmed','In Progress','Completed'], current:2 },
+  completed:   { steps:['Pending','Confirmed','In Progress','Completed'], current:3 },
+  cancelled:   { steps:['Pending','Cancelled'], current:1 },
+};
+
+const BOOKING_STATUS_STYLE = {
+  pending:     { bg:'#FEF3C7', text:'#92400E' },
+  confirmed:   { bg:'#DBEAFE', text:'#1D4ED8' },
+  in_progress: { bg:'#EDE9FE', text:'#6D28D9' },
+  completed:   { bg:'#DCFCE7', text:'#15803D' },
+  cancelled:   { bg:'#FEE2E2', text:'#B91C1C' },
+};
+
+function BookingProgressBar({ status }) {
+  const cfg = STATUS_STEPS[status] || STATUS_STEPS.pending;
+  const col = status==='cancelled' ? '#DC2626' : '#1A5276';
+  return (
+    <div style={{ marginTop:10 }}>
+      <div style={{ display:'flex', alignItems:'center' }}>
+        {cfg.steps.map((s,i)=>(
+          <React.Fragment key={s}>
+            <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:3 }}>
+              <div style={{ width:22, height:22, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center',
+                background: i<=cfg.current ? col : '#E9ECEF', transition:'background 200ms' }}>
+                {i<cfg.current
+                  ? <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round"><path d="M20 6L9 17l-5-5"/></svg>
+                  : <div style={{ width:6, height:6, borderRadius:'50%', background: i===cfg.current ? 'white' : '#ccc' }}></div>}
+              </div>
+              <span style={{ fontSize:9, color: i<=cfg.current ? col : '#ccc', fontWeight: i===cfg.current ? 700 : 400, whiteSpace:'nowrap' }}>{s}</span>
+            </div>
+            {i<cfg.steps.length-1 && <div style={{ flex:1, height:2, background: i<cfg.current ? col : '#E9ECEF', margin:'0 4px', marginBottom:14, transition:'background 200ms' }}></div>}
+          </React.Fragment>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function BookingsPage() {
+  const [tab, setTab] = React.useState('active');
+  const active = BOOKINGS.filter(b=>['pending','confirmed','in_progress'].includes(b.status));
+  const history = BOOKINGS.filter(b=>['completed','cancelled'].includes(b.status));
+  const list = tab==='active' ? active : history;
+
+  return (
+    <div style={PAGE_WRAP}>
+      <div style={MAIN}>
+        <h2 style={PAGE_TITLE}>My Bookings</h2>
+        {/* Tabs */}
+        <div style={{ display:'flex', gap:0, background:'white', borderRadius:12, padding:4, marginBottom:20, boxShadow:'0 2px 8px rgba(0,0,0,.04)', width:'fit-content' }}>
+          {[['active',`Active (${active.length})`],['history',`History (${history.length})`]].map(([id,label])=>(
+            <button key={id} onClick={()=>setTab(id)} style={{ fontSize:13, fontWeight:600, padding:'8px 20px', borderRadius:10, border:'none', cursor:'pointer', fontFamily:"'DM Sans',sans-serif", transition:'all 150ms',
+              background: tab===id ? '#1A5276' : 'transparent',
+              color: tab===id ? 'white' : '#888' }}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+          {list.map(b=>{
+            const sc = BOOKING_STATUS_STYLE[b.status]||{bg:'#F3F4F6',text:'#6B7280'};
+            return (
+              <div key={b.id} style={{ background:'white', borderRadius:16, boxShadow:'0 2px 12px rgba(0,0,0,.04)', padding:'16px 20px' }}>
+                <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
+                  <div>
+                    <div style={{ fontSize:14, fontWeight:700, color:'#1a1a2e' }}>Booking #{b.id} · {b.branch_name}</div>
+                    <div style={{ fontSize:12, color:'#888', marginTop:2 }}>{b.service_name} · {new Date(b.scheduled_at).toLocaleString('en-RW',{dateStyle:'medium',timeStyle:'short'})}</div>
+                  </div>
+                  <span style={{ ...sc, fontSize:11, fontWeight:600, padding:'3px 10px', borderRadius:9999, textTransform:'capitalize', flexShrink:0 }}>{b.status.replace('_',' ')}</span>
+                </div>
+                {tab==='active' && <BookingProgressBar status={b.status} />}
+              </div>
+            );
+          })}
+          {list.length===0 && <p style={{ color:'#aaa', fontSize:14 }}>No {tab} bookings.</p>}
+        </div>
+      </div>
+      <Footer />
+    </div>
+  );
+}
+
+function VehiclesPage() {
+  const [vehicles, setVehicles] = React.useState(VEHICLES);
+  const [showForm, setShowForm] = React.useState(false);
+  const [form, setForm] = React.useState({ plate:'', make:'', model:'', vehicle_type:'Sedan', color:'' });
+  const [formError, setFormError] = React.useState('');
+
+  const inp = { width:'100%', background:'#fafbfc', border:'1.5px solid #E9ECEF', borderRadius:10, padding:'10px 14px', fontSize:13, fontFamily:"'DM Sans',sans-serif", color:'#1a1a2e', outline:'none' };
+
+  const handleAdd = (e) => {
+    e.preventDefault(); setFormError('');
+    if(!form.plate||!form.make||!form.model) { setFormError('Plate, make, and model are required'); return; }
+    setVehicles(prev=>[...prev, { id:prev.length+1, plate_number:form.plate.toUpperCase(), make:form.make, model:form.model, vehicle_type:form.vehicle_type, color:form.color }]);
+    setForm({ plate:'', make:'', model:'', vehicle_type:'Sedan', color:'' });
+    setShowForm(false);
+  };
+
+  return (
+    <div style={PAGE_WRAP}>
+      <div style={MAIN}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20, flexWrap:'wrap', gap:12 }}>
+          <h2 style={{ ...PAGE_TITLE, margin:0 }}>My Vehicles</h2>
+          <button onClick={()=>setShowForm(v=>!v)} style={{ background: showForm?'#F3F4F6':'#F39C12', color: showForm?'#888':'#1a1a2e', fontSize:13, fontWeight:600, padding:'9px 20px', borderRadius:12, border:'none', cursor:'pointer', fontFamily:"'DM Sans',sans-serif", transition:'all 150ms' }}>
+            {showForm ? '✕ Cancel' : '+ Add Vehicle'}
+          </button>
+        </div>
+
+        {/* Inline add form */}
+        {showForm && (
+          <div style={{ background:'white', borderRadius:16, boxShadow:'0 2px 12px rgba(0,0,0,.04)', padding:24, marginBottom:20, border:'1.5px dashed #E9ECEF' }}>
+            <div style={{ fontSize:14, fontWeight:700, color:'#1a1a2e', marginBottom:16 }}>Add New Vehicle</div>
+            {formError && <div style={{ background:'#FEE2E2', color:'#B91C1C', fontSize:12, borderRadius:8, padding:'8px 12px', marginBottom:12 }}>{formError}</div>}
+            <form onSubmit={handleAdd} style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+              {[['Plate Number','plate','RAX 000 X'],['Make','make','Toyota'],['Model','model','Corolla'],['Color','color','White']].map(([label,key,ph])=>(
+                <div key={key}>
+                  <label style={{ fontSize:12, fontWeight:500, color:'#555', display:'block', marginBottom:4 }}>{label}</label>
+                  <input value={form[key]} onChange={e=>setForm(p=>({...p,[key]:e.target.value}))} placeholder={ph} style={inp} />
+                </div>
+              ))}
+              <div>
+                <label style={{ fontSize:12, fontWeight:500, color:'#555', display:'block', marginBottom:4 }}>Type</label>
+                <select value={form.vehicle_type} onChange={e=>setForm(p=>({...p,vehicle_type:e.target.value}))} style={{ ...inp, appearance:'none' }}>
+                  {['Sedan','SUV','Hatchback','Pickup','Van','Other'].map(t=><option key={t}>{t}</option>)}
+                </select>
+              </div>
+              <div style={{ display:'flex', alignItems:'flex-end' }}>
+                <button type="submit" style={{ width:'100%', background:'#1A5276', color:'white', fontSize:13, fontWeight:600, padding:'10px', borderRadius:10, border:'none', cursor:'pointer', fontFamily:"'DM Sans',sans-serif" }}>
+                  Add Vehicle
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))', gap:12 }}>
+          {vehicles.map(v => <VehicleCard key={v.id} vehicle={v} />)}
+        </div>
+      </div>
+      <Footer />
+    </div>
+  );
+}
+
+// ─── BookingFlowPage — 4-step booking wizard ──────────────────────────────────
+const TIME_SLOTS = ['08:00','08:30','09:00','09:30','10:00','10:30','11:00','11:30',
+  '13:00','13:30','14:00','14:30','15:00','15:30','16:00','16:30','17:00'];
+const TAKEN_SLOTS = ['08:30','09:30','11:00','13:30','15:00'];
+
+function StepIndicator({ step }) {
+  const steps = ['Service','Vehicle','Date & Time','Review'];
+  return (
+    <div style={{ display:'flex', alignItems:'center', marginBottom:28 }}>
+      {steps.map((label, i) => {
+        const num = i + 1;
+        const done = num < step;
+        const active = num === step;
+        return (
+          <React.Fragment key={label}>
+            <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:5, flexShrink:0 }}>
+              <div style={{ width:32, height:32, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700,
+                background: done ? '#1A5276' : active ? '#F39C12' : '#E9ECEF',
+                color: done || active ? 'white' : '#AAA', transition:'all 200ms' }}>
+                {done
+                  ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round"><path d="M20 6L9 17l-5-5"/></svg>
+                  : num}
+              </div>
+              <span style={{ fontSize:10, fontWeight: active ? 700 : 400, color: active ? '#1A5276' : '#AAA', whiteSpace:'nowrap' }}>{label}</span>
+            </div>
+            {i < steps.length - 1 && <div style={{ flex:1, height:2, background: done ? '#1A5276' : '#E9ECEF', margin:'0 6px', marginBottom:18, transition:'background 200ms' }}></div>}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
+function BookingFlowPage({ service, branch, setPage, setBookingDetails }) {
+  const svc = service || SERVICES[0];
+  const brn = branch || BRANCHES[0];
+  const [step, setStep] = React.useState(1);
+  const [selectedVehicle, setSelectedVehicle] = React.useState(VEHICLES[0]);
+  const [addingNew, setAddingNew] = React.useState(false);
+  const [newVehicle, setNewVehicle] = React.useState({ plate:'', make:'', model:'', color:'' });
+  const [vehicles, setVehicles] = React.useState(VEHICLES);
+
+  // Date picker state
+  const today = new Date();
+  const [calMonth, setCalMonth] = React.useState(today.getMonth());
+  const [calYear, setCalYear] = React.useState(today.getFullYear());
+  const [selectedDate, setSelectedDate] = React.useState(null);
+  const [selectedTime, setSelectedTime] = React.useState(null);
+
+  const inp = { width:'100%', background:'#fafbfc', border:'1.5px solid #E9ECEF', borderRadius:10, padding:'10px 14px', fontSize:14, fontFamily:"'DM Sans',sans-serif", color:'#1a1a2e', outline:'none' };
+  const cardS = { background:'white', borderRadius:16, boxShadow:'0 2px 12px rgba(0,0,0,.04)', padding:20, marginBottom:16 };
+
+  // Calendar helpers
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const monthName = new Date(calYear, calMonth, 1).toLocaleString('en', { month:'long' });
+  const DAYS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+  const isPast = (d) => {
+    const dt = new Date(calYear, calMonth, d);
+    dt.setHours(0,0,0,0); const t = new Date(); t.setHours(0,0,0,0);
+    return dt < t;
+  };
+  const isSelected = (d) => selectedDate && selectedDate.getDate()===d && selectedDate.getMonth()===calMonth && selectedDate.getFullYear()===calYear;
+
+  const formattedDate = selectedDate ? selectedDate.toLocaleDateString('en-RW', { weekday:'short', month:'short', day:'numeric' }) : '—';
+
+  const addVehicle = () => {
+    if (!newVehicle.plate || !newVehicle.make || !newVehicle.model) return;
+    const v = { id: vehicles.length+1, ...newVehicle, vehicle_type:'Sedan' };
+    setVehicles(prev => [...prev, v]);
+    setSelectedVehicle(v);
+    setAddingNew(false);
+    setNewVehicle({ plate:'', make:'', model:'', color:'' });
+  };
+
+  const deposit = Math.round(svc.price * 0.3);
+  const balance = svc.price - deposit;
+
+  // ── Step 1: Service summary ───────────────────────────────────────────────
+  const Step1 = () => (
+    <div>
+      <div style={cardS}>
+        <div style={{ fontSize:11, fontWeight:600, color:'#888', letterSpacing:'.08em', textTransform:'uppercase', marginBottom:14 }}>Booking for</div>
+        <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:12, marginBottom:16 }}>
+          <div>
+            <div style={{ fontFamily:"'Playfair Display',serif", fontSize:20, fontWeight:700, color:'#1a1a2e', marginBottom:4 }}>{svc.name}</div>
+            <div style={{ fontSize:13, color:'#888' }}>{brn.name} · {brn.address}</div>
+          </div>
+          <div style={{ textAlign:'right', flexShrink:0 }}>
+            <div style={{ fontFamily:"'Playfair Display',serif", fontSize:22, fontWeight:700, color:'#1A5276' }}>RWF {Number(svc.price).toLocaleString()}</div>
+            <div style={{ fontSize:12, color:'#aaa', marginTop:2 }}>{svc.duration_minutes} min</div>
+          </div>
+        </div>
+        {svc.description && <div style={{ background:'#F8F9FA', borderRadius:10, padding:'10px 14px', fontSize:13, color:'#555' }}>{svc.description}</div>}
+      </div>
+      <div style={cardS}>
+        <div style={{ fontSize:11, fontWeight:600, color:'#888', letterSpacing:'.08em', textTransform:'uppercase', marginBottom:12 }}>Service Details</div>
+        {[['Category', svc.category_display||svc.category], ['Duration', `${svc.duration_minutes} minutes`], ['Branch', brn.name], ['Hours', `${brn.opening_time} – ${brn.closing_time}`]].map(([k,v]) => (
+          <div key={k} style={{ display:'flex', justifyContent:'space-between', fontSize:13, padding:'6px 0', borderBottom:'1px solid #F9FAFB' }}>
+            <span style={{ color:'#888' }}>{k}</span><span style={{ fontWeight:500, color:'#1a1a2e' }}>{v}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  // ── Step 2: Vehicle ───────────────────────────────────────────────────────
+  const Step2 = () => (
+    <div>
+      <div style={cardS}>
+        <div style={{ fontSize:11, fontWeight:600, color:'#888', letterSpacing:'.08em', textTransform:'uppercase', marginBottom:14 }}>Your Vehicles</div>
+        <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:12 }}>
+          {vehicles.map(v => (
+            <button key={v.id} onClick={()=>setSelectedVehicle(v)} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:12, border:`2px solid ${selectedVehicle?.id===v.id ? '#2E86C1' : '#E9ECEF'}`, background: selectedVehicle?.id===v.id ? '#EFF6FF' : 'white', cursor:'pointer', textAlign:'left', fontFamily:"'DM Sans',sans-serif", transition:'all 150ms' }}>
+              <div style={{ width:40, height:40, borderRadius:10, background:selectedVehicle?.id===v.id ? '#1A5276' : '#F3F4F6', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={selectedVehicle?.id===v.id ? 'white' : '#888'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M19 17H5a2 2 0 01-2-2V9a2 2 0 012-2h14a2 2 0 012 2v6a2 2 0 01-2 2z"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/>
+                </svg>
+              </div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:14, fontWeight:700, color:'#1a1a2e', letterSpacing:'.03em' }}>{v.plate_number}</div>
+                <div style={{ fontSize:12, color:'#888', marginTop:1 }}>{v.make} {v.model} · {v.color}</div>
+              </div>
+              <div style={{ width:18, height:18, borderRadius:'50%', border:`2px solid ${selectedVehicle?.id===v.id ? '#2E86C1' : '#E9ECEF'}`, background: selectedVehicle?.id===v.id ? '#2E86C1' : 'white', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                {selectedVehicle?.id===v.id && <div style={{ width:7, height:7, borderRadius:'50%', background:'white' }}></div>}
+              </div>
+            </button>
+          ))}
+        </div>
+        {!addingNew
+          ? <button onClick={()=>setAddingNew(true)} style={{ width:'100%', background:'none', border:'1.5px dashed #E9ECEF', borderRadius:12, padding:'12px', fontSize:13, fontWeight:600, color:'#2E86C1', cursor:'pointer', fontFamily:"'DM Sans',sans-serif" }}>+ Add New Vehicle</button>
+          : (
+            <div style={{ background:'#F8F9FA', borderRadius:12, padding:16 }}>
+              <div style={{ fontSize:12, fontWeight:700, color:'#1a1a2e', marginBottom:12 }}>New Vehicle</div>
+              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                {[['Plate Number','plate','RAX 000 X'],['Make','make','Toyota'],['Model','model','Corolla'],['Color','color','White']].map(([label,key,ph]) => (
+                  <div key={key}>
+                    <label style={{ fontSize:12, fontWeight:500, color:'#555', display:'block', marginBottom:4 }}>{label}</label>
+                    <input value={newVehicle[key]} onChange={e=>setNewVehicle(p=>({...p,[key]:e.target.value}))} placeholder={ph} style={{ ...inp, fontSize:13, padding:'8px 12px' }} />
+                  </div>
+                ))}
+                <div style={{ display:'flex', gap:8, marginTop:4 }}>
+                  <button onClick={()=>setAddingNew(false)} style={{ flex:1, background:'white', border:'1.5px solid #E9ECEF', borderRadius:10, padding:'10px', fontSize:13, fontWeight:600, color:'#888', cursor:'pointer', fontFamily:"'DM Sans',sans-serif" }}>Cancel</button>
+                  <button onClick={addVehicle} style={{ flex:2, background:'#1A5276', color:'white', border:'none', borderRadius:10, padding:'10px', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:"'DM Sans',sans-serif" }}>Add Vehicle</button>
+                </div>
+              </div>
+            </div>
+          )
+        }
+      </div>
+    </div>
+  );
+
+  // ── Step 3: Date & time ───────────────────────────────────────────────────
+  const Step3 = () => (
+    <div>
+      <div style={cardS}>
+        <div style={{ fontSize:11, fontWeight:600, color:'#888', letterSpacing:'.08em', textTransform:'uppercase', marginBottom:14 }}>Select Date</div>
+        {/* Month nav */}
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
+          <button onClick={()=>{ if(calMonth===0){setCalMonth(11);setCalYear(y=>y-1);}else setCalMonth(m=>m-1); }} style={{ background:'none', border:'1px solid #E9ECEF', borderRadius:8, width:32, height:32, cursor:'pointer', fontSize:16, color:'#555', display:'flex', alignItems:'center', justifyContent:'center' }}>‹</button>
+          <span style={{ fontSize:14, fontWeight:600, color:'#1a1a2e' }}>{monthName} {calYear}</span>
+          <button onClick={()=>{ if(calMonth===11){setCalMonth(0);setCalYear(y=>y+1);}else setCalMonth(m=>m+1); }} style={{ background:'none', border:'1px solid #E9ECEF', borderRadius:8, width:32, height:32, cursor:'pointer', fontSize:16, color:'#555', display:'flex', alignItems:'center', justifyContent:'center' }}>›</button>
+        </div>
+        {/* Day headers */}
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:2, marginBottom:4 }}>
+          {DAYS.map(d => <div key={d} style={{ textAlign:'center', fontSize:10, fontWeight:600, color:'#AAA', padding:'4px 0' }}>{d}</div>)}
+        </div>
+        {/* Calendar grid */}
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:3 }}>
+          {Array(firstDay).fill(null).map((_,i) => <div key={'e'+i}></div>)}
+          {Array(daysInMonth).fill(null).map((_,i) => {
+            const d = i + 1;
+            const past = isPast(d);
+            const sel = isSelected(d);
+            return (
+              <button key={d} onClick={()=>!past && setSelectedDate(new Date(calYear, calMonth, d))} disabled={past}
+                style={{ aspectRatio:'1', borderRadius:8, border:'none', fontSize:13, fontWeight: sel ? 700 : 400,
+                  background: sel ? '#1A5276' : 'transparent', color: sel ? 'white' : past ? '#DDD' : '#1a1a2e',
+                  cursor: past ? 'not-allowed' : 'pointer', fontFamily:"'DM Sans',sans-serif", transition:'background 150ms' }}>
+                {d}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      {selectedDate && (
+        <div style={cardS}>
+          <div style={{ fontSize:11, fontWeight:600, color:'#888', letterSpacing:'.08em', textTransform:'uppercase', marginBottom:14 }}>
+            Available Times · {formattedDate}
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:8 }}>
+            {TIME_SLOTS.map(t => {
+              const taken = TAKEN_SLOTS.includes(t);
+              const sel = selectedTime === t;
+              return (
+                <button key={t} onClick={()=>!taken && setSelectedTime(t)} disabled={taken}
+                  style={{ padding:'10px 0', borderRadius:10, border: sel ? 'none' : `1.5px solid ${taken ? '#F3F4F6' : '#E9ECEF'}`,
+                    background: sel ? '#F39C12' : taken ? '#F9FAFB' : 'white',
+                    color: sel ? '#1a1a2e' : taken ? '#CCC' : '#1a1a2e',
+                    fontSize:12, fontWeight: sel ? 700 : 400, cursor: taken ? 'not-allowed' : 'pointer',
+                    fontFamily:"'DM Sans',sans-serif", textDecoration: taken ? 'line-through' : 'none',
+                    transition:'all 150ms' }}>
+                  {t}
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ display:'flex', gap:12, marginTop:14, fontSize:11, color:'#AAA' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:5 }}><div style={{ width:12, height:12, borderRadius:3, background:'#F39C12' }}></div> Selected</div>
+            <div style={{ display:'flex', alignItems:'center', gap:5 }}><div style={{ width:12, height:12, borderRadius:3, background:'#F9FAFB', border:'1px solid #E9ECEF' }}></div> Taken</div>
+            <div style={{ display:'flex', alignItems:'center', gap:5 }}><div style={{ width:12, height:12, borderRadius:3, background:'white', border:'1px solid #E9ECEF' }}></div> Available</div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  // ── Step 4: Review ────────────────────────────────────────────────────────
+  const Step4 = () => (
+    <div>
+      <div style={cardS}>
+        <div style={{ fontSize:11, fontWeight:600, color:'#888', letterSpacing:'.08em', textTransform:'uppercase', marginBottom:14 }}>Booking Summary</div>
+        {[
+          ['Service', svc.name],
+          ['Branch', brn.name],
+          ['Vehicle', `${selectedVehicle?.plate_number} · ${selectedVehicle?.make} ${selectedVehicle?.model}`],
+          ['Date', formattedDate],
+          ['Time', selectedTime || '—'],
+          ['Duration', `${svc.duration_minutes} min`],
+        ].map(([k,v]) => (
+          <div key={k} style={{ display:'flex', justifyContent:'space-between', fontSize:13, padding:'8px 0', borderBottom:'1px solid #F9FAFB' }}>
+            <span style={{ color:'#888' }}>{k}</span><span style={{ fontWeight:500, color:'#1a1a2e', textAlign:'right', maxWidth:'60%' }}>{v}</span>
+          </div>
+        ))}
+      </div>
+      <div style={cardS}>
+        <div style={{ fontSize:11, fontWeight:600, color:'#888', letterSpacing:'.08em', textTransform:'uppercase', marginBottom:14 }}>Price Breakdown</div>
+        <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, padding:'6px 0', borderBottom:'1px solid #F9FAFB' }}>
+          <span style={{ color:'#888' }}>Service price</span><span style={{ fontWeight:500 }}>RWF {Number(svc.price).toLocaleString()}</span>
+        </div>
+        <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, padding:'6px 0', borderBottom:'1px solid #F9FAFB' }}>
+          <span style={{ color:'#888' }}>Deposit (30%)</span><span style={{ fontWeight:500, color:'#F39C12' }}>RWF {deposit.toLocaleString()}</span>
+        </div>
+        <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, padding:'6px 0', borderBottom:'1px solid #F9FAFB' }}>
+          <span style={{ color:'#888' }}>Balance on arrival</span><span style={{ fontWeight:500, color:'#888' }}>RWF {balance.toLocaleString()}</span>
+        </div>
+        <div style={{ display:'flex', justifyContent:'space-between', fontSize:16, fontWeight:800, color:'#1A5276', paddingTop:12, marginTop:4 }}>
+          <span>Due now</span><span>RWF {deposit.toLocaleString()}</span>
+        </div>
+        <div style={{ background:'#FEF9EE', borderRadius:10, padding:'10px 12px', fontSize:12, color:'#92400E', marginTop:10 }}>
+          💡 Pay 30% deposit now to confirm. Remaining balance is collected at the branch.
+        </div>
+      </div>
+    </div>
+  );
+
+  const canNext = () => {
+    if (step===1) return true;
+    if (step===2) return !!selectedVehicle;
+    if (step===3) return !!selectedDate && !!selectedTime;
+    return true;
+  };
+
+  return (
+    <div style={PAGE_WRAP}>
+      <div style={{ ...MAIN, maxWidth:560 }}>
+        <button onClick={()=> step===1 ? setPage('branch') : setStep(s=>s-1)} style={{ display:'flex', alignItems:'center', gap:4, color:'#2E86C1', background:'none', border:'none', cursor:'pointer', fontSize:13, fontWeight:500, fontFamily:"'DM Sans',sans-serif", marginBottom:24, padding:0 }}>
+          ← {step===1 ? 'Back to services' : 'Previous step'}
+        </button>
+        <StepIndicator step={step} />
+        {step===1 && <Step1 />}
+        {step===2 && <Step2 />}
+        {step===3 && <Step3 />}
+        {step===4 && <Step4 />}
+        <button
+          onClick={() => {
+            if (step < 4) { setStep(s=>s+1); }
+            else { setBookingDetails({ vehicle: selectedVehicle, date: selectedDate, time: selectedTime }); setPage('payment'); }
+          }}
+          disabled={!canNext()}
+          style={{ width:'100%', background: canNext() ? (step===4 ? '#F39C12' : '#1A5276') : '#E9ECEF', color: canNext() ? (step===4 ? '#1a1a2e' : 'white') : '#AAA', fontSize:15, fontWeight:700, padding:'14px', borderRadius:12, border:'none', cursor: canNext() ? 'pointer' : 'not-allowed', fontFamily:"'DM Sans',sans-serif", boxShadow: canNext() && step===4 ? '0 4px 16px rgba(243,156,18,.25)' : 'none', transition:'all 150ms', marginTop:8 }}>
+          {step < 4 ? 'Continue →' : 'Proceed to Payment →'}
+        </button>
+      </div>
+      <Footer />
+    </div>
+  );
+}
+
+// ─── PaymentPage ──────────────────────────────────────────────────────────────
+function PaymentPage({ service, branch, setPage }) {
+  const svc = service || SERVICES[0];
+  const brn = branch || BRANCHES[0];
+  const [method, setMethod] = React.useState('momo');
+  const [phone, setPhone] = React.useState('0782693724');
+  const [state, setState] = React.useState('idle'); // idle | processing | success
+
+  const handlePay = () => {
+    setState('processing');
+    setTimeout(() => setState('success'), 2200);
+  };
+
+  const confNum = 'SS-' + Math.floor(10000 + Math.random() * 90000);
+  const scheduled = new Date(); scheduled.setDate(scheduled.getDate() + 1);
+  const dateStr = scheduled.toLocaleDateString('en-RW', { weekday:'short', month:'short', day:'numeric' });
+  const timeStr = '10:30 AM';
+
+  const methodBtn = (id, logo, label, sub) => (
+    <button key={id} onClick={() => setMethod(id)} style={{
+      display:'flex', alignItems:'center', gap:12, padding:'14px 16px',
+      borderRadius:12, border: `2px solid ${method===id ? '#2E86C1' : '#E9ECEF'}`,
+      background: method===id ? '#EFF6FF' : 'white', cursor:'pointer', width:'100%',
+      transition:'all 150ms', fontFamily:"'DM Sans',sans-serif",
+    }}>
+      <div style={{ width:40, height:40, borderRadius:10, background: id==='momo' ? '#FFCC00' : '#DC143C', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+        <span style={{ fontSize:13, fontWeight:800, color: id==='momo' ? '#333' : 'white', letterSpacing:'-0.02em' }}>{logo}</span>
+      </div>
+      <div style={{ textAlign:'left' }}>
+        <div style={{ fontSize:14, fontWeight:600, color:'#1a1a2e' }}>{label}</div>
+        <div style={{ fontSize:11, color:'#888', marginTop:1 }}>{sub}</div>
+      </div>
+      <div style={{ marginLeft:'auto', width:18, height:18, borderRadius:'50%', border:`2px solid ${method===id ? '#2E86C1' : '#E9ECEF'}`, background: method===id ? '#2E86C1' : 'white', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+        {method===id && <div style={{ width:7, height:7, borderRadius:'50%', background:'white' }}></div>}
+      </div>
+    </button>
+  );
+
+  if (state === 'processing') return (
+    <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:20, padding:32 }}>
+      <div style={{ width:64, height:64, borderRadius:'50%', border:'4px solid #E9ECEF', borderTopColor:'#2E86C1', animation:'spin 0.8s linear infinite' }}></div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <div style={{ textAlign:'center' }}>
+        <div style={{ fontFamily:"'DM Sans',sans-serif", fontSize:18, fontWeight:700, color:'#1a1a2e' }}>Processing Payment…</div>
+        <div style={{ fontSize:13, color:'#888', marginTop:4 }}>Waiting for MTN MoMo confirmation</div>
+      </div>
+      <div style={{ background:'#FEF9EE', borderRadius:12, padding:'12px 20px', fontSize:13, color:'#888', textAlign:'center', maxWidth:280 }}>
+        Check your phone for a payment prompt from MTN MoMo
+      </div>
+    </div>
+  );
+
+  if (state === 'success') return (
+    <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:20, padding:32 }}>
+      <div style={{ width:72, height:72, borderRadius:'50%', background:'#DCFCE7', display:'flex', alignItems:'center', justifyContent:'center' }}>
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#15803D" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M20 6L9 17l-5-5"/>
+        </svg>
+      </div>
+      <div style={{ textAlign:'center' }}>
+        <div style={{ fontFamily:"'Playfair Display',serif", fontSize:24, fontWeight:700, color:'#1a1a2e' }}>Booking Confirmed!</div>
+        <div style={{ fontSize:14, color:'#888', marginTop:6 }}>Your car wash is scheduled for {dateStr} at {timeStr}</div>
+      </div>
+      <div style={{ background:'white', borderRadius:16, boxShadow:'0 2px 12px rgba(0,0,0,.06)', padding:'20px 24px', width:'100%', maxWidth:360, display:'flex', flexDirection:'column', gap:10 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', fontSize:13 }}>
+          <span style={{ color:'#888' }}>Confirmation #</span>
+          <span style={{ fontWeight:700, color:'#1A5276', letterSpacing:'0.05em' }}>{confNum}</span>
+        </div>
+        <div style={{ display:'flex', justifyContent:'space-between', fontSize:13 }}>
+          <span style={{ color:'#888' }}>Service</span>
+          <span style={{ fontWeight:600, color:'#1a1a2e' }}>{svc.name}</span>
+        </div>
+        <div style={{ display:'flex', justifyContent:'space-between', fontSize:13 }}>
+          <span style={{ color:'#888' }}>Branch</span>
+          <span style={{ fontWeight:600, color:'#1a1a2e' }}>{brn.name}</span>
+        </div>
+        <div style={{ display:'flex', justifyContent:'space-between', fontSize:13 }}>
+          <span style={{ color:'#888' }}>Amount Paid</span>
+          <span style={{ fontWeight:700, color:'#1a1a2e' }}>RWF {Number(svc.price).toLocaleString()}</span>
+        </div>
+        <div style={{ height:1, background:'#F3F4F6', margin:'4px 0' }}></div>
+        <div style={{ display:'flex', justifyContent:'space-between', fontSize:13 }}>
+          <span style={{ color:'#888' }}>Payment via</span>
+          <span style={{ fontWeight:600, color:'#1a1a2e' }}>MTN MoMo</span>
+        </div>
+      </div>
+      <button onClick={()=>setPage('bookings')} style={{ background:'#1A5276', color:'white', fontSize:14, fontWeight:600, padding:'12px 32px', borderRadius:12, border:'none', cursor:'pointer', fontFamily:"'DM Sans',sans-serif" }}>
+        View My Bookings →
+      </button>
+      <button onClick={()=>setPage('home')} style={{ background:'none', color:'#888', fontSize:13, border:'none', cursor:'pointer', fontFamily:"'DM Sans',sans-serif" }}>
+        Back to Home
+      </button>
+    </div>
+  );
+
+  return (
+    <div style={PAGE_WRAP}>
+      <div style={{ ...MAIN, maxWidth:520 }}>
+        <button onClick={()=>setPage('branch')} style={{ display:'flex', alignItems:'center', gap:4, color:'#2E86C1', background:'none', border:'none', cursor:'pointer', fontSize:13, fontWeight:500, fontFamily:"'DM Sans',sans-serif", marginBottom:20, padding:0 }}>
+          ← Back to services
+        </button>
+        <h2 style={{ fontFamily:"'Playfair Display',serif", fontSize:24, fontWeight:700, color:'#1a1a2e', marginBottom:20 }}>Complete Payment</h2>
+
+        {/* Order summary */}
+        <div style={{ background:'white', borderRadius:16, boxShadow:'0 2px 12px rgba(0,0,0,.04)', padding:20, marginBottom:16 }}>
+          <div style={{ fontSize:11, fontWeight:600, color:'#888', letterSpacing:'.08em', textTransform:'uppercase', marginBottom:12 }}>Order Summary</div>
+          {[
+            ['Service', svc.name],
+            ['Branch', brn.name],
+            ['Date', dateStr],
+            ['Time', timeStr],
+            ['Duration', `${svc.duration_minutes} min`],
+          ].map(([k,v]) => (
+            <div key={k} style={{ display:'flex', justifyContent:'space-between', fontSize:13, padding:'5px 0', borderBottom:'1px solid #F9FAFB' }}>
+              <span style={{ color:'#888' }}>{k}</span>
+              <span style={{ fontWeight:500, color:'#1a1a2e' }}>{v}</span>
+            </div>
+          ))}
+          <div style={{ display:'flex', justifyContent:'space-between', fontSize:16, fontWeight:800, color:'#1A5276', paddingTop:12, marginTop:4 }}>
+            <span>Total</span>
+            <span>RWF {Number(svc.price).toLocaleString()}</span>
+          </div>
+        </div>
+
+        {/* Payment method */}
+        <div style={{ background:'white', borderRadius:16, boxShadow:'0 2px 12px rgba(0,0,0,.04)', padding:20, marginBottom:16 }}>
+          <div style={{ fontSize:11, fontWeight:600, color:'#888', letterSpacing:'.08em', textTransform:'uppercase', marginBottom:12 }}>Payment Method</div>
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            {methodBtn('momo', 'MoMo', 'MTN Mobile Money', 'Recommended · Instant')}
+            {methodBtn('airtel', 'AT', 'Airtel Money', 'Airtel Rwanda subscribers')}
+          </div>
+        </div>
+
+        {/* Phone input */}
+        <div style={{ background:'white', borderRadius:16, boxShadow:'0 2px 12px rgba(0,0,0,.04)', padding:20, marginBottom:24 }}>
+          <div style={{ fontSize:11, fontWeight:600, color:'#888', letterSpacing:'.08em', textTransform:'uppercase', marginBottom:12 }}>
+            {method==='momo' ? 'MTN MoMo' : 'Airtel Money'} Phone Number
+          </div>
+          <label style={{ fontSize:13, fontWeight:500, color:'#1a1a2e', display:'block', marginBottom:6 }}>Phone Number</label>
+          <input value={phone} onChange={e=>setPhone(e.target.value)}
+            style={{ width:'100%', background:'#fafbfc', border:'1.5px solid #E9ECEF', borderRadius:10, padding:'10px 14px', fontSize:14, fontFamily:"'DM Sans',sans-serif", color:'#1a1a2e', outline:'none' }} />
+          <p style={{ fontSize:11, color:'#aaa', marginTop:6 }}>A payment prompt will be sent to this number</p>
+        </div>
+
+        {/* Pay button */}
+        <button onClick={handlePay} style={{ width:'100%', background:'#F39C12', color:'#1a1a2e', fontSize:16, fontWeight:700, padding:'14px', borderRadius:12, border:'none', cursor:'pointer', fontFamily:"'DM Sans',sans-serif", boxShadow:'0 4px 16px rgba(243,156,18,.25)', transition:'all 150ms' }}>
+          Pay RWF {Number(svc.price).toLocaleString()}
+        </button>
+        <p style={{ textAlign:'center', fontSize:11, color:'#aaa', marginTop:10 }}>
+          Secured by MTN MoMo · Payments processed in Rwanda
+        </p>
+      </div>
+      <Footer />
+    </div>
+  );
+}
+
+function App() {
+  const [page, setPage] = React.useState('login');
+  const [authPage, setAuthPage] = React.useState('login'); // 'login' | 'register'
+  const [selectedBranch, setSelectedBranch] = React.useState(null);
+  const [selectedService, setSelectedService] = React.useState(null);
+  const [bookingDetails, setBookingDetails] = React.useState(null);
+
+  if (page==='login') {
+    if (authPage==='register') return <RegisterPage setAuthPage={setAuthPage} onLogin={()=>setPage('home')} />;
+    return <LoginPage onLogin={()=>setPage('home')} setAuthPage={setAuthPage} />;
+  }
+  return (
+    <div style={{ display:'flex', flexDirection:'column', minHeight:'100vh' }}>
+      <Navbar currentPage={page} setPage={setPage} />
+      {page==='home' && <HomePage setPage={setPage} setSelectedBranch={setSelectedBranch} />}
+      {page==='branch' && selectedBranch && <BranchDetailPage branch={selectedBranch} setPage={setPage} setSelectedService={setSelectedService} />}
+      {page==='booking' && <BookingFlowPage service={selectedService} branch={selectedBranch} setPage={setPage} setBookingDetails={setBookingDetails} />}
+      {page==='bookings' && <BookingsPage />}
+      {page==='vehicles' && <VehiclesPage />}
+      {page==='payment' && <PaymentPage service={selectedService} branch={selectedBranch} bookingDetails={bookingDetails} setPage={setPage} />}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

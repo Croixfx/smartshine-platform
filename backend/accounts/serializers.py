@@ -17,7 +17,14 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['phone', 'full_name', 'password']
+        fields = ['phone', 'full_name', 'email', 'password']
+        extra_kwargs = {'email': {'required': False, 'allow_blank': True}}
+
+    def validate_phone(self, value):
+        # Keep response generic to avoid account enumeration.
+        if User.objects.filter(phone=value).exists():
+            raise serializers.ValidationError('Unable to create account with provided details.')
+        return value
 
     def create(self, validated_data):
         return User.objects.create_user(**validated_data)
@@ -25,11 +32,6 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 class OTPRequestSerializer(serializers.Serializer):
     phone = serializers.CharField(max_length=20)
-
-    def validate_phone(self, value):
-        if not User.objects.filter(phone=value).exists():
-            raise serializers.ValidationError('No account found with this phone number.')
-        return value
 
 
 class OTPVerifySerializer(serializers.Serializer):
@@ -42,3 +44,14 @@ class UserProfileSerializer(serializers.ModelSerializer):
         model = User
         fields = ['id', 'phone', 'full_name', 'email', 'role', 'is_verified', 'created_at', 'updated_at']
         read_only_fields = ['id', 'phone', 'role', 'is_verified', 'created_at', 'updated_at']
+
+
+class AdminUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'phone', 'full_name', 'email', 'role', 'is_verified', 'is_active', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'phone', 'created_at', 'updated_at']
+
+
+class ChangeRoleSerializer(serializers.Serializer):
+    role = serializers.ChoiceField(choices=User.ROLE_CHOICES)

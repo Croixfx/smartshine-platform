@@ -1,6 +1,8 @@
 from rest_framework import viewsets
-from rest_framework.permissions import AllowAny, IsAdminUser
+from rest_framework.permissions import AllowAny
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
+from accounts.permissions import IsAdmin
 from .models import Branch, ServiceType
 from .serializers import BranchSerializer, BranchDetailSerializer, ServiceTypeSerializer
 
@@ -9,6 +11,7 @@ class BranchViewSet(viewsets.ModelViewSet):
     filterset_fields = ['is_active']
     search_fields = ['name', 'address']
     ordering_fields = ['name', 'created_at']
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get_queryset(self):
         if self.request.user.is_authenticated and self.request.user.role == 'admin':
@@ -23,7 +26,7 @@ class BranchViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ('list', 'retrieve'):
             return [AllowAny()]
-        return [IsAdminUser()]
+        return [IsAdmin()]
 
 
 class ServiceTypeViewSet(viewsets.ModelViewSet):
@@ -40,4 +43,4 @@ class ServiceTypeViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ('list', 'retrieve'):
             return [AllowAny()]
-        return [IsAdminUser()]
+        return [IsAdmin()]
