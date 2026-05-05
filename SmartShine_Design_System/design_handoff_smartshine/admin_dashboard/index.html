@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SmartShine — Admin Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+  *,*::before,*::after{box-sizing:border-box;}
+  html,body{margin:0;padding:0;font-family:'DM Sans',system-ui,sans-serif;background:#F0F4F8;min-height:100vh;}
+  #root{min-height:100vh;display:flex;flex-direction:column;}
+  ::-webkit-scrollbar{width:4px;height:4px;} ::-webkit-scrollbar-track{background:#f1f1f1;} ::-webkit-scrollbar-thumb{background:#ccc;border-radius:4px;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const C = {
+  primary:'#1A5276', primaryDark:'#154360', secondary:'#2E86C1',
+  accent:'#F39C12', bg:'#F0F4F8', surface:'#FFFFFF',
+  border:'#E9ECEF', text:'#1a1a2e', sub:'#888888', dim:'#AAAAAA',
+  success:'#22C55E', successBg:'#DCFCE7', successText:'#15803D',
+  error:'#DC2626', errorBg:'#FEE2E2', errorText:'#B91C1C',
+  warning:'#F59E0B', warningBg:'#FEF3C7', warningText:'#92400E',
+  purple:'#8B5CF6', purpleBg:'#EDE9FE',
+};
+
+const STATUS_COLORS = {
+  pending:     { bg:'#FEF3C7', text:'#92400E' },
+  confirmed:   { bg:'#DBEAFE', text:'#1D4ED8' },
+  in_progress: { bg:'#EDE9FE', text:'#6D28D9' },
+  completed:   { bg:'#DCFCE7', text:'#15803D' },
+  cancelled:   { bg:'#FEE2E2', text:'#B91C1C' },
+};
+
+const BRANCHES = [
+  { id:1, name:'Kigali Centre', address:'KN 4 Ave, Nyarugenge', workers:4, queue:3, is_active:true, revenue:42000 },
+  { id:2, name:'Remera', address:'KG 11 Ave, Gasabo', workers:3, queue:5, is_active:true, revenue:67500 },
+  { id:3, name:'Kicukiro', address:'KK 15 Rd, Kicukiro', workers:2, queue:0, is_active:false, revenue:18000 },
+  { id:4, name:'Nyamirambo', address:'KN 78 St', workers:3, queue:2, is_active:true, revenue:31000 },
+  { id:5, name:'Gisozi', address:'KG 501 St, Gasabo', workers:2, queue:1, is_active:true, revenue:22500 },
+];
+
+const BOOKINGS_DATA = [
+  { id:42, customer:'Sandrine U.', branch:'Remera', service:'Full Body Wash', scheduled:'10:30', status:'confirmed', amount:8000 },
+  { id:41, customer:'Jean C.', branch:'Kigali Centre', service:'Quick Rinse', scheduled:'11:00', status:'in_progress', amount:3000 },
+  { id:40, customer:'Billy Z.', branch:'Gisozi', service:'Premium Detail', scheduled:'09:00', status:'completed', amount:18000 },
+  { id:39, customer:'Aline M.', branch:'Nyamirambo', service:'Tyre & Rim Clean', scheduled:'13:30', status:'pending', amount:4000 },
+  { id:38, customer:'Eric N.', branch:'Kigali Centre', service:'Full Body Wash', scheduled:'08:30', status:'completed', amount:8000 },
+  { id:37, customer:'Grace K.', branch:'Remera', service:'Mobile Wash', scheduled:'14:00', status:'cancelled', amount:12000 },
+  { id:36, customer:'Patrick R.', branch:'Kicukiro', service:'Quick Rinse', scheduled:'09:45', status:'completed', amount:3000 },
+];
+
+const WEEK_REVENUE = [38000, 52000, 47000, 61000, 73000, 95000, 41000];
+const WEEK_LABELS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+const font = (size, weight=400, color='#1a1a2e') => ({ fontFamily:"'DM Sans',sans-serif", fontSize:size, fontWeight:weight, color });
+const card = (extra={}) => ({ background:C.surface, borderRadius:16, boxShadow:'0 2px 12px rgba(0,0,0,.04)', padding:20, ...extra });
+
+// ── Sidebar ───────────────────────────────────────────────────────────────────
+function Sidebar({ page, setPage }) {
+  const navItems = [
+    { id:'overview', icon:'⬛', label:'Overview' },
+    { id:'bookings', icon:'📋', label:'Bookings' },
+    { id:'branches', icon:'🏪', label:'Branches' },
+  ];
+  return (
+    <div style={{ width:220, background:C.primary, minHeight:'100vh', display:'flex', flexDirection:'column', flexShrink:0, position:'sticky', top:0, height:'100vh' }}>
+      <div style={{ padding:'24px 20px', borderBottom:'1px solid rgba(255,255,255,.08)' }}>
+        <div style={{ fontFamily:"'Playfair Display',serif", fontSize:18, fontWeight:700, color:'white' }}>Smart<span style={{ color:C.accent }}>Shine</span></div>
+        <div style={{ fontSize:10, color:'rgba(255,255,255,.4)', letterSpacing:'.1em', textTransform:'uppercase', marginTop:2 }}>Admin Dashboard</div>
+      </div>
+      <nav style={{ padding:'16px 12px', flex:1 }}>
+        {navItems.map(item => (
+          <button key={item.id} onClick={()=>setPage(item.id)} style={{ width:'100%', display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:10, border:'none', background: page===item.id ? 'rgba(255,255,255,.12)' : 'transparent', color: page===item.id ? 'white' : 'rgba(255,255,255,.55)', fontSize:13, fontWeight: page===item.id ? 600 : 400, cursor:'pointer', fontFamily:"'DM Sans',sans-serif", marginBottom:2, textAlign:'left', transition:'all 150ms' }}>
+            <span style={{ fontSize:14 }}>{item.icon}</span> {item.label}
+          </button>
+        ))}
+      </nav>
+      <div style={{ padding:'16px 20px', borderTop:'1px solid rgba(255,255,255,.08)' }}>
+        <div style={font(12, 500, 'rgba(255,255,255,.5)')}>NIYONKURU Jean</div>
+        <div style={font(10, 400, 'rgba(255,255,255,.3)')}>Administrator</div>
+      </div>
+    </div>
+  );
+}
+
+// ── KPI Card ──────────────────────────────────────────────────────────────────
+function KpiCard({ label, value, sub, delta, color }) {
+  const positive = delta > 0;
+  return (
+    <div style={card({ display:'flex', flexDirection:'column', gap:6 })}>
+      <div style={font(11, 600, C.sub)}>{label.toUpperCase()}</div>
+      <div style={{ fontFamily:"'Playfair Display',serif", fontSize:30, fontWeight:700, color: color||C.text, lineHeight:1.1 }}>{value}</div>
+      {delta !== undefined && (
+        <div style={{ display:'flex', alignItems:'center', gap:4, fontSize:11, color: positive ? C.successText : C.errorText, fontWeight:600 }}>
+          <span>{positive ? '↑' : '↓'} {Math.abs(delta)}%</span>
+          <span style={{ fontWeight:400, color:C.dim }}>vs yesterday</span>
+        </div>
+      )}
+      {sub && <div style={font(11, 400, C.dim)}>{sub}</div>}
+    </div>
+  );
+}
+
+// ── Revenue Chart ─────────────────────────────────────────────────────────────
+function RevenueChart() {
+  const max = Math.max(...WEEK_REVENUE);
+  const todayIdx = 5; // Saturday
+  return (
+    <div style={card()}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
+        <div style={font(14, 700)}>Revenue This Week</div>
+        <div style={{ fontFamily:"'Playfair Display',serif", fontSize:18, fontWeight:700, color:C.primary }}>
+          RWF {WEEK_REVENUE.reduce((a,b)=>a+b,0).toLocaleString()}
+        </div>
+      </div>
+      <div style={{ display:'flex', alignItems:'flex-end', gap:8, height:120 }}>
+        {WEEK_LABELS.map((d, i) => (
+          <div key={d} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
+            <div style={{ fontSize:9, color: i===todayIdx ? C.accent : C.dim, fontWeight:600 }}>
+              {i===todayIdx ? `${(WEEK_REVENUE[i]/1000).toFixed(0)}k` : ''}
+            </div>
+            <div style={{ width:'100%', borderRadius:'6px 6px 0 0', height:`${(WEEK_REVENUE[i]/max)*96}px`, background: i===todayIdx ? C.accent : i < todayIdx ? C.primary : C.border, opacity: i===6 ? .4 : 1, transition:'height 400ms' }}></div>
+            <span style={{ fontSize:10, fontWeight: i===todayIdx ? 700 : 400, color: i===todayIdx ? C.accent : C.dim }}>{d}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Overview Page ─────────────────────────────────────────────────────────────
+function OverviewPage() {
+  return (
+    <div style={{ padding:28, flex:1 }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:24 }}>
+        <div>
+          <h2 style={{ fontFamily:"'Playfair Display',serif", fontSize:24, fontWeight:700, color:C.text, margin:'0 0 4px' }}>Good morning 👋</h2>
+          <div style={font(13, 400, C.sub)}>Monday, 28 April 2025 · Kigali, Rwanda</div>
+        </div>
+        <div style={{ display:'flex', gap:8 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:6, background:C.successBg, borderRadius:10, padding:'6px 12px' }}>
+            <div style={{ width:7, height:7, borderRadius:'50%', background:C.success }}></div>
+            <span style={font(12, 600, C.successText)}>4 Branches Active</span>
+          </div>
+        </div>
+      </div>
+
+      {/* KPI row */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, marginBottom:20 }}>
+        <KpiCard label="Today's Bookings" value="24" delta={12} color={C.secondary} />
+        <KpiCard label="Today's Revenue" value="RWF 181k" delta={8} color={C.primary} />
+        <KpiCard label="Active Drivers" value="7" sub="3 on job now" color={C.accent} />
+        <KpiCard label="Queue Depth" value="11" delta={-5} sub="Across all branches" color={C.purple} />
+      </div>
+
+      {/* Chart + recent */}
+      <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr', gap:14, marginBottom:20 }}>
+        <RevenueChart />
+        {/* Branch status */}
+        <div style={card()}>
+          <div style={{ ...font(14, 700), marginBottom:14 }}>Branch Queue</div>
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            {BRANCHES.filter(b=>b.is_active).map(b => (
+              <div key={b.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                <div>
+                  <div style={font(13, 600)}>{b.name}</div>
+                  <div style={font(11, 400, C.dim)}>{b.workers} workers</div>
+                </div>
+                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  <div style={{ width:`${Math.min(b.queue*10, 60)}px`, height:6, borderRadius:3, background: b.queue > 4 ? C.error : b.queue > 2 ? C.warning : C.success }}></div>
+                  <span style={font(12, 600, b.queue > 4 ? C.errorText : b.queue > 2 ? C.warningText : C.successText)}>{b.queue}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Recent bookings */}
+      <div style={card()}>
+        <div style={{ ...font(14, 700), marginBottom:14 }}>Recent Bookings</div>
+        <div style={{ overflowX:'auto' }}>
+          <table style={{ width:'100%', borderCollapse:'collapse' }}>
+            <thead>
+              <tr style={{ borderBottom:`1px solid ${C.border}` }}>
+                {['#','Customer','Branch','Service','Time','Status','Amount'].map(h => (
+                  <th key={h} style={{ textAlign:'left', fontSize:10, fontWeight:700, color:C.dim, padding:'0 8px 8px', letterSpacing:'.06em', textTransform:'uppercase', whiteSpace:'nowrap' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {BOOKINGS_DATA.slice(0,5).map((b, i) => {
+                const sc = STATUS_COLORS[b.status] || { bg:'#F3F4F6', text:'#6B7280' };
+                return (
+                  <tr key={b.id} style={{ borderBottom: i < 4 ? `1px solid ${C.border}` : 'none' }}>
+                    <td style={{ padding:'10px 8px', fontSize:12, color:C.dim }}>#{b.id}</td>
+                    <td style={{ padding:'10px 8px', fontSize:13, fontWeight:600, color:C.text, whiteSpace:'nowrap' }}>{b.customer}</td>
+                    <td style={{ padding:'10px 8px', fontSize:13, color:C.sub, whiteSpace:'nowrap' }}>{b.branch}</td>
+                    <td style={{ padding:'10px 8px', fontSize:13, color:C.sub, whiteSpace:'nowrap' }}>{b.service}</td>
+                    <td style={{ padding:'10px 8px', fontSize:13, color:C.dim }}>{b.scheduled}</td>
+                    <td style={{ padding:'10px 8px' }}><span style={{ ...sc, fontSize:10, fontWeight:600, padding:'2px 8px', borderRadius:9999 }}>{b.status.replace('_',' ')}</span></td>
+                    <td style={{ padding:'10px 8px', fontSize:13, fontWeight:700, color:C.primary, whiteSpace:'nowrap' }}>RWF {b.amount.toLocaleString()}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Bookings Page ─────────────────────────────────────────────────────────────
+function BookingsPage() {
+  const [filter, setFilter] = React.useState('all');
+  const statuses = ['all','pending','confirmed','in_progress','completed','cancelled'];
+  const filtered = filter==='all' ? BOOKINGS_DATA : BOOKINGS_DATA.filter(b=>b.status===filter);
+
+  return (
+    <div style={{ padding:28, flex:1 }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:24 }}>
+        <h2 style={{ fontFamily:"'Playfair Display',serif", fontSize:22, fontWeight:700, color:C.text, margin:0 }}>All Bookings</h2>
+        <span style={font(13, 400, C.sub)}>{filtered.length} of {BOOKINGS_DATA.length}</span>
+      </div>
+
+      {/* Filter tabs */}
+      <div style={{ display:'flex', gap:6, marginBottom:20, flexWrap:'wrap' }}>
+        {statuses.map(s => {
+          const sc = STATUS_COLORS[s] || { bg:C.surface, text:C.sub };
+          const active = filter===s;
+          return (
+            <button key={s} onClick={()=>setFilter(s)} style={{ background: active ? (s==='all' ? C.primary : sc.bg) : C.surface, color: active ? (s==='all' ? 'white' : sc.text) : C.sub, fontSize:12, fontWeight:600, padding:'6px 14px', borderRadius:9999, border:`1px solid ${active ? 'transparent' : C.border}`, cursor:'pointer', fontFamily:"'DM Sans',sans-serif", textTransform:'capitalize' }}>
+              {s.replace('_',' ')}
+            </button>
+          );
+        })}
+      </div>
+
+      <div style={card()}>
+        <div style={{ overflowX:'auto' }}>
+          <table style={{ width:'100%', borderCollapse:'collapse' }}>
+            <thead>
+              <tr style={{ borderBottom:`1px solid ${C.border}` }}>
+                {['#','Customer','Branch','Service','Scheduled','Status','Amount',''].map(h => (
+                  <th key={h} style={{ textAlign:'left', fontSize:10, fontWeight:700, color:C.dim, padding:'0 10px 10px', letterSpacing:'.06em', textTransform:'uppercase', whiteSpace:'nowrap' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((b, i) => {
+                const sc = STATUS_COLORS[b.status] || { bg:'#F3F4F6', text:'#6B7280' };
+                return (
+                  <tr key={b.id} style={{ borderBottom: i < filtered.length-1 ? `1px solid ${C.border}` : 'none', transition:'background 150ms' }}>
+                    <td style={{ padding:'12px 10px', fontSize:12, color:C.dim, fontFamily:'monospace' }}>#{b.id}</td>
+                    <td style={{ padding:'12px 10px', fontSize:13, fontWeight:600, color:C.text, whiteSpace:'nowrap' }}>{b.customer}</td>
+                    <td style={{ padding:'12px 10px', fontSize:13, color:C.sub }}>{b.branch}</td>
+                    <td style={{ padding:'12px 10px', fontSize:13, color:C.sub, whiteSpace:'nowrap' }}>{b.service}</td>
+                    <td style={{ padding:'12px 10px', fontSize:13, color:C.dim }}>{b.scheduled}</td>
+                    <td style={{ padding:'12px 10px' }}><span style={{ ...sc, fontSize:10, fontWeight:600, padding:'3px 10px', borderRadius:9999, textTransform:'capitalize' }}>{b.status.replace('_',' ')}</span></td>
+                    <td style={{ padding:'12px 10px', fontSize:13, fontWeight:700, color:C.primary }}>RWF {b.amount.toLocaleString()}</td>
+                    <td style={{ padding:'12px 10px' }}>
+                      <button style={{ background:'none', border:`1px solid ${C.border}`, color:C.sub, fontSize:11, fontWeight:600, padding:'4px 10px', borderRadius:8, cursor:'pointer', fontFamily:"'DM Sans',sans-serif" }}>View</button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        {filtered.length===0 && <p style={{ ...font(14, 400, C.dim), textAlign:'center', padding:'20px 0' }}>No bookings match this filter.</p>}
+      </div>
+    </div>
+  );
+}
+
+// ── Branches Page ─────────────────────────────────────────────────────────────
+function BranchesPage() {
+  const [search, setSearch] = React.useState('');
+  const filtered = BRANCHES.filter(b => b.name.toLowerCase().includes(search.toLowerCase()));
+  return (
+    <div style={{ padding:28, flex:1 }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:24 }}>
+        <h2 style={{ fontFamily:"'Playfair Display',serif", fontSize:22, fontWeight:700, color:C.text, margin:0 }}>Branches</h2>
+        <div style={{ display:'flex', gap:10 }}>
+          <input placeholder="Search…" value={search} onChange={e=>setSearch(e.target.value)}
+            style={{ background:C.surface, border:`1.5px solid ${C.border}`, borderRadius:10, padding:'8px 14px', fontSize:13, fontFamily:"'DM Sans',sans-serif", outline:'none', width:180, color:C.text }} />
+          <button style={{ background:C.accent, color:C.text, fontSize:13, fontWeight:700, padding:'8px 18px', borderRadius:10, border:'none', cursor:'pointer', fontFamily:"'DM Sans',sans-serif" }}>+ Add Branch</button>
+        </div>
+      </div>
+
+      <div style={card()}>
+        <table style={{ width:'100%', borderCollapse:'collapse' }}>
+          <thead>
+            <tr style={{ borderBottom:`1px solid ${C.border}` }}>
+              {['Branch','Address','Workers','Queue','Revenue (Today)','Status',''].map(h => (
+                <th key={h} style={{ textAlign:'left', fontSize:10, fontWeight:700, color:C.dim, padding:'0 10px 10px', letterSpacing:'.06em', textTransform:'uppercase', whiteSpace:'nowrap' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((b, i) => (
+              <tr key={b.id} style={{ borderBottom: i < filtered.length-1 ? `1px solid ${C.border}` : 'none' }}>
+                <td style={{ padding:'14px 10px', fontSize:14, fontWeight:700, color:C.text }}>{b.name}</td>
+                <td style={{ padding:'14px 10px', fontSize:13, color:C.sub }}>{b.address}</td>
+                <td style={{ padding:'14px 10px', fontSize:13, color:C.text, fontWeight:600 }}>{b.workers}</td>
+                <td style={{ padding:'14px 10px' }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    <div style={{ width:Math.min(b.queue*8, 48), height:6, borderRadius:3, background: b.queue>4?C.error:b.queue>2?C.warning:C.success }}></div>
+                    <span style={{ fontSize:13, fontWeight:600, color: b.queue>4?C.errorText:b.queue>2?C.warningText:C.successText }}>{b.queue}</span>
+                  </div>
+                </td>
+                <td style={{ padding:'14px 10px', fontSize:13, fontWeight:700, color:C.primary }}>RWF {b.revenue.toLocaleString()}</td>
+                <td style={{ padding:'14px 10px' }}>
+                  <span style={{ fontSize:11, fontWeight:600, padding:'3px 10px', borderRadius:9999, background: b.is_active ? '#DCFCE7' : '#F3F4F6', color: b.is_active ? '#15803D' : '#6B7280' }}>
+                    {b.is_active ? 'Active' : 'Inactive'}
+                  </span>
+                </td>
+                <td style={{ padding:'14px 10px' }}>
+                  <button style={{ background:'none', border:`1px solid ${C.border}`, color:C.sub, fontSize:11, fontWeight:600, padding:'4px 10px', borderRadius:8, cursor:'pointer', fontFamily:"'DM Sans',sans-serif" }}>Manage</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ── App ───────────────────────────────────────────────────────────────────────
+function App() {
+  const [page, setPage] = React.useState('overview');
+  return (
+    <div style={{ display:'flex', minHeight:'100vh' }}>
+      <Sidebar page={page} setPage={setPage} />
+      <div style={{ flex:1, display:'flex', flexDirection:'column', minWidth:0, overflowY:'auto' }}>
+        {page==='overview' && <OverviewPage />}
+        {page==='bookings' && <BookingsPage />}
+        {page==='branches' && <BranchesPage />}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

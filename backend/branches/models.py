@@ -10,6 +10,7 @@ class Branch(models.Model):
     is_active = models.BooleanField(default=True)
     opening_time = models.TimeField()
     closing_time = models.TimeField()
+    image = models.ImageField(upload_to='branches/', blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

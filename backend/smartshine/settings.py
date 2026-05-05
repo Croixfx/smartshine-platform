@@ -126,6 +126,15 @@ CELERY_RESULT_BACKEND = env('REDIS_URL', default='redis://localhost:6379')
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 
+# ── Email ─────────────────────────────────────────────────────────────────────
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
+DEFAULT_FROM_EMAIL = 'SmartShine <noreply@smartshine.rw>'
+
 # ── Africa's Talking ──────────────────────────────────────────────────────────
 AFRICASTALKING_USERNAME = env('AFRICASTALKING_USERNAME', default='')
 AFRICASTALKING_API_KEY = env('AFRICASTALKING_API_KEY', default='')

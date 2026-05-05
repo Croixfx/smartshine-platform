@@ -1,10 +1,10 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
-from accounts.views import RegisterView, OTPRequestView, OTPVerifyView, ProfileView
+from accounts.views import RegisterView, OTPRequestView, OTPVerifyView, ProfileView, AdminUserListView, AdminUserDetailView
 from branches.views import BranchViewSet, ServiceTypeViewSet
 from vehicles.views import VehicleViewSet
-from bookings.views import BookingViewSet
+from bookings.views import BookingViewSet, AvailableSlotsView
 from payments.views import PaymentViewSet, InitiatePaymentView
 from notifications.views import SMSLogViewSet
 
@@ -17,6 +17,9 @@ router.register(r'payments', PaymentViewSet, basename='payment')
 router.register(r'notifications/sms-logs', SMSLogViewSet, basename='sms-log')
 
 urlpatterns = [
+    # Explicit paths before router so they don't get swallowed by viewset lookups
+    path('bookings/available-slots/', AvailableSlotsView.as_view(), name='available-slots'),
+
     # Router endpoints
     path('', include(router.urls)),
 
@@ -25,6 +28,8 @@ urlpatterns = [
     path('accounts/otp/request/', OTPRequestView.as_view(), name='otp-request'),
     path('accounts/otp/verify/', OTPVerifyView.as_view(), name='otp-verify'),
     path('accounts/profile/', ProfileView.as_view(), name='profile'),
+    path('accounts/users/', AdminUserListView.as_view(), name='admin-user-list'),
+    path('accounts/users/<int:user_id>/', AdminUserDetailView.as_view(), name='admin-user-detail'),
 
     # Payments (non-viewset)
     path('payments/initiate/', InitiatePaymentView.as_view(), name='payment-initiate'),

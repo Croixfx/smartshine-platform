@@ -18,7 +18,7 @@ class BranchSerializer(serializers.ModelSerializer):
         model = Branch
         fields = [
             'id', 'name', 'address', 'latitude', 'longitude',
-            'capacity', 'is_active', 'opening_time', 'closing_time', 'created_at',
+            'capacity', 'is_active', 'opening_time', 'closing_time', 'image', 'created_at',
         ]
         read_only_fields = ['created_at']
 
