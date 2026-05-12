@@ -429,7 +429,7 @@ function InProgressTab({ jobs }) {
       <div style={{ textAlign: 'center', padding: '60px 20px' }}>
         <div style={{ fontSize: 48, marginBottom: 12 }}>🫧</div>
         <div style={f(16, 600, C.sub)}>No cars being washed</div>
-        <div style={f(13, 400, C.dim)}>Cars at the branch will appear here.</div>
+        <div style={f(13, 400, C.dim)}>Cars at the branch will appear here</div>
       </div>
     )
   }
@@ -605,7 +605,7 @@ export default function DriverPortal() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <GPSIndicator tracking={gpsTracking} />
           <button onClick={doRefresh} disabled={refreshing} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,.1)', border: 'none', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', color: 'white', fontFamily: "'DM Sans',sans-serif", fontSize: 12, fontWeight: 600 }}>
-            <RefreshIcon /> Refresh
+            <RefreshIcon /> Refresh now
           </button>
         </div>
       </div>
