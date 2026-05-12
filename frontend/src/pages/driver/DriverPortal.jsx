@@ -429,7 +429,7 @@ function InProgressTab({ jobs }) {
       <div style={{ textAlign: 'center', padding: '60px 20px' }}>
         <div style={{ fontSize: 48, marginBottom: 12 }}>🫧</div>
         <div style={f(16, 600, C.sub)}>No cars being washed</div>
-        <div style={f(13, 400, C.dim)}>Cars at the branch will appear here</div>
+        <div style={f(13, 400, C.dim)}>Cars at the branch will appear here.</div>
       </div>
     )
   }
