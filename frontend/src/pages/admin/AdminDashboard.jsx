@@ -5,12 +5,21 @@ import client from '../../api/client'
 const BACKEND = 'http://localhost:8000'
 
 const STATUS_COLORS = {
-  pending: { bg: '#FEF3C7', text: '#92400E' },
-  confirmed: { bg: '#DBEAFE', text: '#1E40AF' },
-  in_progress: { bg: '#E0E7FF', text: '#3730A3' },
-  washing: { bg: '#CFFAFE', text: '#155E75' },
-  done: { bg: '#D1FAE5', text: '#065F46' },
-  cancelled: { bg: '#FEE2E2', text: '#991B1B' },
+  pending:          { bg: '#FEF3C7', text: '#92400E' },
+  confirmed:        { bg: '#DBEAFE', text: '#1E40AF' },
+  driver_assigned:  { bg: '#EEF2FF', text: '#3730A3' },
+  en_route_pickup:  { bg: '#F5F3FF', text: '#6D28D9' },
+  at_customer:      { bg: '#FEF3C7', text: '#B45309' },
+  en_route_branch:  { bg: '#ECFDF5', text: '#047857' },
+  received:         { bg: '#E0E7FF', text: '#3730A3' },
+  washing:          { bg: '#CFFAFE', text: '#155E75' },
+  rinsing:          { bg: '#EDE9FE', text: '#7C3AED' },
+  drying:           { bg: '#FEF9C3', text: '#B45309' },
+  done:             { bg: '#D1FAE5', text: '#065F46' },
+  out_for_delivery: { bg: '#FEF9C3', text: '#92400E' },
+  delivered:        { bg: '#D1FAE5', text: '#065F46' },
+  collected:        { bg: '#D1FAE5', text: '#065F46' },
+  cancelled:        { bg: '#FEE2E2', text: '#991B1B' },
 }
 
 const PAYMENT_COLORS = {
@@ -27,7 +36,12 @@ const ROLE_COLORS = {
   admin: { bg: '#FEE2E2', text: '#991B1B' },
 }
 
-const ALL_STATUSES = ['pending', 'confirmed', 'in_progress', 'washing', 'done', 'cancelled']
+const ALL_STATUSES = [
+  'pending', 'confirmed',
+  'driver_assigned', 'en_route_pickup', 'at_customer', 'en_route_branch',
+  'received', 'washing', 'rinsing', 'drying', 'done',
+  'out_for_delivery', 'delivered', 'collected', 'cancelled',
+]
 const ALL_PAYMENT_STATUSES = ['unpaid', 'deposit_paid', 'fully_paid', 'refunded']
 const ALL_ROLES = ['customer', 'worker', 'driver', 'admin']
 
@@ -37,6 +51,27 @@ const FALLBACK_BRANCH_IMAGES = [
   'https://images.unsplash.com/photo-1601362840469-51e4d8d58785?auto=format&fit=crop&w=600&q=80',
   'https://images.unsplash.com/photo-1494976388531-d1058494cdd8?auto=format&fit=crop&w=600&q=80',
 ]
+
+const SERVICE_TEMPLATES = [
+  { name: 'Exterior Wash',       category: 'traditional', duration_minutes: 30,  default_price: 3000,  description: 'Full exterior hand wash' },
+  { name: 'Interior Cleaning',   category: 'traditional', duration_minutes: 45,  default_price: 4000,  description: 'Vacuum and interior wipe-down' },
+  { name: 'Interior + Exterior', category: 'traditional', duration_minutes: 60,  default_price: 6000,  description: 'Full interior and exterior wash' },
+  { name: 'Full Detailing',      category: 'traditional', duration_minutes: 120, default_price: 15000, description: 'Complete detail — inside and out' },
+  { name: 'Quick Auto Wash',     category: 'automatic',   duration_minutes: 15,  default_price: 5000,  description: 'Automated exterior wash' },
+  { name: 'Premium Auto Wash',   category: 'automatic',   duration_minutes: 25,  default_price: 8000,  description: 'Automated wash with wax coating' },
+  { name: 'Engine Cleaning',     category: 'traditional', duration_minutes: 45,  default_price: 5000,  description: 'Engine bay cleaning' },
+  { name: 'Waxing & Polish',     category: 'traditional', duration_minutes: 60,  default_price: 8000,  description: 'Hand wax and machine polish' },
+  { name: 'Mobile Wash',         category: 'mobile',      duration_minutes: 60,  default_price: 7000,  description: 'We come to your location' },
+]
+
+const CATEGORY_COLORS = {
+  traditional: { bg: '#DBEAFE', text: '#1D4ED8' },
+  automatic:   { bg: '#D1FAE5', text: '#065F46' },
+  mobile:      { bg: '#EDE9FE', text: '#6D28D9' },
+}
+
+const initSvcState = () =>
+  Object.fromEntries(SERVICE_TEMPLATES.map(t => [t.name, { checked: false, price: String(t.default_price), id: null }]))
 
 function branchImage(b, idx) {
   if (b.image) return b.image.startsWith('http') ? b.image : `${BACKEND}${b.image}`
@@ -186,20 +221,23 @@ function Modal({ open, onClose, title, children }) {
 function StatCard({ icon, label, value, color }) {
   return (
     <div style={{
-      background: 'white', borderRadius: 16, padding: '20px 18px',
-      boxShadow: '0 2px 12px rgba(0,0,0,.04)', display: 'flex', alignItems: 'center', gap: 14,
-      border: '1px solid #F3F4F6',
+      background: 'white', borderRadius: 16, padding: '20px 20px 18px',
+      boxShadow: '0 4px 24px rgba(0,0,0,.09)',
+      border: '1px solid #E2E8F0',
+      borderTop: `3px solid ${color}`,
+      display: 'flex', alignItems: 'center', gap: 16,
     }}>
       <div style={{
-        width: 44, height: 44, borderRadius: 12,
-        background: `${color}12`, color: color,
+        width: 50, height: 50, borderRadius: 14, flexShrink: 0,
+        background: color, color: 'white',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
+        boxShadow: `0 4px 14px ${color}55`,
       }}>
         {icon}
       </div>
       <div>
-        <div style={{ fontSize: 11, color: '#888', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.05em' }}>{label}</div>
-        <div style={{ fontSize: 24, fontWeight: 800, color }}>{value}</div>
+        <div style={{ fontSize: 11, color: '#94A3B8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 3 }}>{label}</div>
+        <div style={{ fontSize: 26, fontWeight: 800, color: '#1E293B', lineHeight: 1.1 }}>{value}</div>
       </div>
     </div>
   )
@@ -287,12 +325,13 @@ export default function AdminDashboard() {
   }
 
   return (
+    <div style={{ minHeight: '100vh', background: '#F1F5F9' }}>
     <div style={{ maxWidth: 1200, margin: '0 auto', padding: '32px 20px 60px' }}>
       <div style={{ marginBottom: 28 }}>
         <h1 style={{ fontFamily: "'Playfair Display',serif", fontSize: 32, fontWeight: 800, color: '#1a1a2e', margin: 0 }}>
           Admin Dashboard
         </h1>
-        <p style={{ fontSize: 14, color: '#888', marginTop: 4 }}>Manage branches, bookings, and users</p>
+        <p style={{ fontSize: 14, color: '#64748B', marginTop: 4 }}>Manage branches, bookings, and users</p>
       </div>
 
       {error && (
@@ -303,6 +342,7 @@ export default function AdminDashboard() {
       {currentTab === 'branches' && <BranchesTab branches={branches} setBranches={setBranches} />}
       {currentTab === 'bookings' && <BookingsTab bookings={bookings} setBookings={setBookings} users={users} />}
       {currentTab === 'users' && <UsersTab users={users} setUsers={setUsers} />}
+    </div>
     </div>
   )
 }
@@ -327,8 +367,8 @@ function OverviewTab({ stats, bookings, branches }) {
         ))}
       </div>
 
-      <div style={{ background: 'white', borderRadius: 16, boxShadow: '0 2px 12px rgba(0,0,0,.04)', border: '1px solid #F3F4F6', overflow: 'hidden' }}>
-        <div style={{ padding: '18px 20px', borderBottom: '1px solid #F3F4F6' }}>
+      <div style={{ background: 'white', borderRadius: 16, boxShadow: '0 4px 24px rgba(0,0,0,.09)', border: '1px solid #E2E8F0', overflow: 'hidden' }}>
+        <div style={{ padding: '18px 20px', borderBottom: '1px solid #E9EEF4', background: '#FAFBFD' }}>
           <h3 style={{ fontSize: 16, fontWeight: 700, color: '#1a1a2e', margin: 0 }}>Recent Bookings</h3>
         </div>
         {recent.length === 0 ? (
@@ -343,7 +383,7 @@ function OverviewTab({ stats, bookings, branches }) {
               </tr></thead>
               <tbody>
                 {recent.map(b => (
-                  <tr key={b.id} style={{ borderTop: '1px solid #F3F4F6' }}>
+                  <tr key={b.id} style={{ borderTop: '1px solid #E9EEF4' }}>
                     <td style={{ padding: '12px 16px', fontWeight: 700, fontFamily: 'monospace', fontSize: 12, color: '#1a1a2e' }}>{b.booking_ref}</td>
                     <td style={{ padding: '12px 16px', color: '#555' }}>{b.customer_name || b.customer_phone}</td>
                     <td style={{ padding: '12px 16px', color: '#555' }}>{b.branch_name}</td>
@@ -364,7 +404,7 @@ function OverviewTab({ stats, bookings, branches }) {
 
 /* ─────────────────────── BRANCHES ─────────────────────── */
 
-const EMPTY_BRANCH = { name: '', address: '', latitude: '', longitude: '', capacity: 10, opening_time: '07:00', closing_time: '19:00', is_active: true }
+const EMPTY_BRANCH = { name: '', address: '', latitude: '', longitude: '', capacity: 10, opening_time: '07:00', closing_time: '19:00', is_active: true, image_url: '' }
 
 function BranchesTab({ branches, setBranches }) {
   const [modal, setModal] = useState(null)
@@ -376,6 +416,8 @@ function BranchesTab({ branches, setBranches }) {
   const [deleteId, setDeleteId] = useState(null)
   const [formError, setFormError] = useState('')
   const [search, setSearch] = useState('')
+  const [svcState, setSvcState] = useState(initSvcState)
+  const [loadingSvcs, setLoadingSvcs] = useState(false)
   const fileRef = useRef(null)
 
   const filtered = branches.filter(b =>
@@ -384,10 +426,12 @@ function BranchesTab({ branches, setBranches }) {
 
   const openCreate = () => {
     setForm(EMPTY_BRANCH); setEditId(null); setFormError('')
-    setImageFile(null); setImagePreview(null); setModal('create')
+    setImageFile(null); setImagePreview(null)
+    setSvcState(initSvcState())
+    setModal('create')
   }
 
-  const openEdit = (b) => {
+  const openEdit = async (b) => {
     setForm({
       name: b.name, address: b.address,
       latitude: b.latitude, longitude: b.longitude,
@@ -395,11 +439,27 @@ function BranchesTab({ branches, setBranches }) {
       opening_time: b.opening_time?.slice(0, 5) || '07:00',
       closing_time: b.closing_time?.slice(0, 5) || '19:00',
       is_active: b.is_active,
+      image_url: b.image_url || '',
     })
     setEditId(b.id); setFormError('')
     setImageFile(null)
     setImagePreview(b.image ? branchImage(b, 0) : null)
     setModal('edit')
+
+    // Load existing services for this branch
+    setLoadingSvcs(true)
+    const fresh = initSvcState()
+    try {
+      const { data } = await client.get(`services/?branch=${b.id}`)
+      const svcs = data.results ?? data
+      svcs.forEach(s => {
+        if (fresh[s.name]) {
+          fresh[s.name] = { checked: true, price: String(s.price), id: s.id }
+        }
+      })
+    } catch {}
+    setSvcState(fresh)
+    setLoadingSvcs(false)
   }
 
   const handleImageChange = (e) => {
@@ -425,15 +485,38 @@ function BranchesTab({ branches, setBranches }) {
     fd.append('closing_time', form.closing_time)
     fd.append('is_active', form.is_active)
     if (imageFile) fd.append('image', imageFile)
+    if (form.image_url) fd.append('image_url', form.image_url)
 
     try {
+      let branchId = editId
       if (modal === 'create') {
         const { data } = await client.post('branches/', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
         setBranches(prev => [...prev, data])
+        branchId = data.id
       } else {
         const { data } = await client.patch(`branches/${editId}/`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
         setBranches(prev => prev.map(b => b.id === editId ? data : b))
       }
+
+      // Sync services
+      const svcOps = []
+      for (const t of SERVICE_TEMPLATES) {
+        const svc = svcState[t.name]
+        if (svc.checked && svc.id === null) {
+          svcOps.push(client.post('services/', {
+            branch: branchId, name: t.name, description: t.description,
+            price: svc.price || t.default_price,
+            duration_minutes: t.duration_minutes,
+            category: t.category, is_available: true,
+          }))
+        } else if (svc.checked && svc.id !== null) {
+          svcOps.push(client.patch(`services/${svc.id}/`, { price: svc.price || t.default_price }))
+        } else if (!svc.checked && svc.id !== null) {
+          svcOps.push(client.delete(`services/${svc.id}/`))
+        }
+      }
+      if (svcOps.length) await Promise.all(svcOps)
+
       setModal(null)
     } catch (err) {
       const d = err.response?.data
@@ -471,12 +554,16 @@ function BranchesTab({ branches, setBranches }) {
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(320px,1fr))', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(320px,1fr))', gap: 20 }}>
         {filtered.map((b, i) => (
           <div key={b.id} style={{
             background: 'white', borderRadius: 16, overflow: 'hidden',
-            boxShadow: '0 2px 12px rgba(0,0,0,.04)', border: '1px solid #F3F4F6',
-          }}>
+            boxShadow: '0 4px 24px rgba(0,0,0,.09)', border: '1px solid #E2E8F0',
+            transition: 'transform .15s, box-shadow .15s',
+          }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 16px 40px rgba(0,0,0,.13)' }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 4px 24px rgba(0,0,0,.09)' }}
+          >
             <div style={{ height: 160, position: 'relative', overflow: 'hidden' }}>
               <img
                 src={branchImage(b, i)}
@@ -494,14 +581,16 @@ function BranchesTab({ branches, setBranches }) {
                 <h4 style={{ fontSize: 18, fontWeight: 700, color: 'white', margin: 0, textShadow: '0 1px 4px rgba(0,0,0,.4)' }}>{b.name}</h4>
               </div>
             </div>
-            <div style={{ padding: 18 }}>
-              <p style={{ fontSize: 13, color: '#888', margin: '0 0 12px', lineHeight: 1.4 }}>{b.address}</p>
-              <div style={{ display: 'flex', gap: 16, fontSize: 12, color: '#aaa', marginBottom: 14 }}>
+            <div style={{ padding: '16px 18px 18px' }}>
+              <p style={{ fontSize: 13, color: '#64748B', margin: '0 0 12px', lineHeight: 1.4 }}>{b.address}</p>
+              <div style={{ display: 'flex', gap: 16, fontSize: 12, color: '#94A3B8', marginBottom: 14 }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><IconClock /> {b.opening_time?.slice(0, 5)} - {b.closing_time?.slice(0, 5)}</span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><IconCapacity /> Capacity: {b.capacity}</span>
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => openEdit(b)} style={{ ...secondaryBtn, flex: 1 }}>Edit</button>
+                <button onClick={() => openEdit(b)} style={{ ...secondaryBtn, flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+                  <IconEdit /> Edit &amp; Services
+                </button>
                 <button onClick={() => setDeleteId(b.id)} style={dangerBtn}>Delete</button>
               </div>
             </div>
@@ -542,6 +631,11 @@ function BranchesTab({ branches, setBranches }) {
             <input ref={fileRef} type="file" accept="image/*" onChange={handleImageChange} style={{ display: 'none' }} />
           </div>
           <div>
+            <label style={labelStyle}>Image URL (optional)</label>
+            <input style={inputStyle} value={form.image_url} onChange={e => updateField('image_url', e.target.value)} placeholder="https://example.com/branch-photo.jpg" />
+            <p style={{ fontSize: 11, color: '#aaa', margin: '4px 0 0', fontFamily: "'DM Sans',sans-serif" }}>Enter an external URL instead of uploading a file</p>
+          </div>
+          <div>
             <label style={labelStyle}>Branch Name *</label>
             <input style={inputStyle} value={form.name} onChange={e => updateField('name', e.target.value)} placeholder="e.g. Kigali City Center" />
           </div>
@@ -577,6 +671,76 @@ function BranchesTab({ branches, setBranches }) {
             <input type="checkbox" id="isActive" checked={form.is_active} onChange={e => updateField('is_active', e.target.checked)} style={{ width: 16, height: 16, cursor: 'pointer' }} />
             <label htmlFor="isActive" style={{ fontSize: 13, fontWeight: 500, color: '#1a1a2e', cursor: 'pointer' }}>Branch is active (visible to customers)</label>
           </div>
+
+          {/* ── Services ── */}
+          <div style={{ borderTop: '1.5px solid #E9ECEF', paddingTop: 16 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#1a1a2e', marginBottom: 2 }}>Services Offered</div>
+            <div style={{ fontSize: 12, color: '#888', marginBottom: 14 }}>
+              Select which services this branch offers and set branch-specific prices. Default prices are pre-filled.
+            </div>
+
+            {loadingSvcs ? (
+              <div style={{ textAlign: 'center', padding: '16px 0', fontSize: 13, color: '#aaa' }}>Loading services...</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {SERVICE_TEMPLATES.map(t => {
+                  const svc = svcState[t.name]
+                  const catColor = CATEGORY_COLORS[t.category] || CATEGORY_COLORS.traditional
+                  return (
+                    <div key={t.name} style={{
+                      border: `1.5px solid ${svc.checked ? '#1A5276' : '#E2E8F0'}`,
+                      borderRadius: 10, padding: '10px 14px',
+                      background: svc.checked ? '#EEF5FC' : '#FAFBFC',
+                      transition: 'all 150ms',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                        <input
+                          type="checkbox"
+                          id={`svc-${t.name}`}
+                          checked={svc.checked}
+                          onChange={e => setSvcState(prev => ({ ...prev, [t.name]: { ...prev[t.name], checked: e.target.checked } }))}
+                          style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#1A5276', flexShrink: 0 }}
+                        />
+                        <label htmlFor={`svc-${t.name}`} style={{ flex: 1, cursor: 'pointer', minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: '#1a1a2e' }}>{t.name}</span>
+                            <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 9999, background: catColor.bg, color: catColor.text, textTransform: 'capitalize' }}>
+                              {t.category}
+                            </span>
+                            <span style={{ fontSize: 11, color: '#94A3B8' }}>{t.duration_minutes} min</span>
+                          </div>
+                          <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>{t.description}</div>
+                        </label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                          {svc.checked ? (
+                            <>
+                              <input
+                                type="number"
+                                value={svc.price}
+                                onChange={e => setSvcState(prev => ({ ...prev, [t.name]: { ...prev[t.name], price: e.target.value } }))}
+                                style={{ ...inputStyle, width: 100, padding: '5px 10px', fontSize: 13 }}
+                                min="0"
+                              />
+                              <span style={{ fontSize: 12, color: '#555', fontWeight: 600 }}>RWF</span>
+                            </>
+                          ) : (
+                            <span style={{ fontSize: 12, color: '#aaa' }}>Default: {t.default_price.toLocaleString()} RWF</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {Object.values(svcState).filter(s => s.checked).length === 0 && !loadingSvcs && (
+              <div style={{ fontSize: 12, color: '#F59E0B', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 8, padding: '8px 12px', marginTop: 10 }}>
+                No services selected — customers won't be able to book this branch.
+              </div>
+            )}
+          </div>
+
           <button onClick={handleSave} disabled={saving} style={primaryBtn(saving)}>
             {saving ? 'Saving...' : modal === 'create' ? 'Create Branch' : 'Save Changes'}
           </button>
@@ -679,36 +843,40 @@ function BookingsTab({ bookings, setBookings, users }) {
         onChange={e => setSearch(e.target.value)} style={{ ...inputStyle, maxWidth: 360, marginBottom: 16 }} />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(340px,1fr))', gap: 16 }}>
-        {filtered.map(b => (
+        {filtered.map(b => {
+          const accentColor = STATUS_COLORS[b.status]?.text || '#94A3B8'
+          return (
           <div key={b.id} onClick={() => setDetailBooking(b)} style={{
-            background: 'white', borderRadius: 16, padding: 20, cursor: 'pointer',
-            boxShadow: '0 2px 12px rgba(0,0,0,.04)', border: '1px solid #F3F4F6',
+            background: 'white', borderRadius: 16, padding: '18px 20px 18px 16px', cursor: 'pointer',
+            boxShadow: '0 4px 20px rgba(0,0,0,.08)', border: '1px solid #E2E8F0',
+            borderLeft: `4px solid ${accentColor}`,
             transition: 'transform .15s, box-shadow .15s',
           }}
-            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,.08)' }}
-            onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,.04)' }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 12px 32px rgba(0,0,0,.12)' }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,.08)' }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
               <div>
-                <div style={{ fontFamily: 'monospace', fontSize: 13, fontWeight: 700, color: '#1a1a2e', marginBottom: 4 }}>{b.booking_ref}</div>
-                <div style={{ fontSize: 13, color: '#555' }}>{b.customer_name || b.customer_phone}</div>
+                <div style={{ fontFamily: 'monospace', fontSize: 13, fontWeight: 700, color: '#1a1a2e', marginBottom: 2 }}>{b.booking_ref}</div>
+                <div style={{ fontSize: 13, color: '#374151', fontWeight: 500 }}>{b.customer_name || b.customer_phone}</div>
               </div>
               <Badge colors={STATUS_COLORS[b.status] || STATUS_COLORS.pending}>{(b.status || '').replace('_', ' ')}</Badge>
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
               <Badge colors={PAYMENT_COLORS[b.payment_status] || PAYMENT_COLORS.unpaid}>{(b.payment_status || '').replace('_', ' ')}</Badge>
             </div>
-            <div style={{ fontSize: 12, color: '#888', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
-              <span><strong>Branch:</strong> {b.branch_name}</span>
-              <span><strong>Service:</strong> {b.service_name}</span>
-              <span><strong>Date:</strong> {b.date}</span>
-              <span><strong>Time:</strong> {b.time_slot?.slice(0, 5)}</span>
-              <span><strong>Plate:</strong> {b.vehicle_plate}</span>
-              {b.assigned_worker_name && <span><strong>Worker:</strong> {b.assigned_worker_name}</span>}
-              {b.assigned_driver_name && <span><strong>Driver:</strong> {b.assigned_driver_name}</span>}
+            <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: 10, fontSize: 12, color: '#64748B', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px 12px' }}>
+              <span><strong style={{ color: '#475569' }}>Branch:</strong> {b.branch_name}</span>
+              <span><strong style={{ color: '#475569' }}>Service:</strong> {b.service_name}</span>
+              <span><strong style={{ color: '#475569' }}>Date:</strong> {b.date}</span>
+              <span><strong style={{ color: '#475569' }}>Time:</strong> {b.time_slot?.slice(0, 5)}</span>
+              <span><strong style={{ color: '#475569' }}>Plate:</strong> {b.vehicle_plate}</span>
+              {b.assigned_worker_name && <span><strong style={{ color: '#475569' }}>Worker:</strong> {b.assigned_worker_name}</span>}
+              {b.assigned_driver_name && <span><strong style={{ color: '#475569' }}>Driver:</strong> {b.assigned_driver_name}</span>}
             </div>
           </div>
-        ))}
+        )})}
+
       </div>
 
       {filtered.length === 0 && (
@@ -737,7 +905,7 @@ function BookingsTab({ bookings, setBookings, users }) {
               </div>
             )}
 
-            <div style={{ borderTop: '1px solid #F3F4F6', paddingTop: 16 }}>
+            <div style={{ borderTop: '1px solid #E9EEF4', paddingTop: 16 }}>
               <label style={labelStyle}>Status</label>
               <select
                 value={detailBooking.status}
@@ -885,7 +1053,7 @@ function UsersTab({ users, setUsers }) {
       <input placeholder="Search by name, phone, or email..." value={search}
         onChange={e => setSearch(e.target.value)} style={{ ...inputStyle, maxWidth: 360, marginBottom: 16 }} />
 
-      <div style={{ background: 'white', borderRadius: 16, boxShadow: '0 2px 12px rgba(0,0,0,.04)', border: '1px solid #F3F4F6', overflow: 'hidden' }}>
+      <div style={{ background: 'white', borderRadius: 16, boxShadow: '0 4px 24px rgba(0,0,0,.09)', border: '1px solid #E2E8F0', overflow: 'hidden' }}>
         {filtered.length === 0 ? (
           <div style={{ padding: 48, textAlign: 'center', color: '#aaa', fontSize: 14 }}>No users found</div>
         ) : (
@@ -898,7 +1066,7 @@ function UsersTab({ users, setUsers }) {
               </tr></thead>
               <tbody>
                 {filtered.map(u => (
-                  <tr key={u.id} style={{ borderTop: '1px solid #F3F4F6' }}
+                  <tr key={u.id} style={{ borderTop: '1px solid #E9EEF4' }}
                     onMouseEnter={e => e.currentTarget.style.background = '#FAFBFC'}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                     <td style={{ padding: '12px 14px' }}>

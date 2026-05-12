@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
+import client from '../../api/client'
 
 const C = {
   primary: '#1A5276', primaryDark: '#154360', secondary: '#2E86C1',
@@ -9,30 +10,43 @@ const C = {
   sidebar: '#0F2744',
 }
 
-const MILESTONES = [
-  { id: 'on_way', label: 'On Way' },
-  { id: 'arrived', label: 'Arrived' },
-  { id: 'collected', label: 'Collected' },
-  { id: 'at_branch', label: 'At Branch' },
-  { id: 'returning', label: 'Returning' },
-  { id: 'delivered', label: 'Delivered' },
-]
+const DRIVER_ACTIONS = {
+  driver_assigned:  { label: '🚗 Start — En Route to Customer',    color: '#2563EB' },
+  en_route_pickup:  { label: '📍 I\'ve Arrived at Customer',        color: '#7C3AED' },
+  at_customer:      { label: '🔑 Car Collected — Heading to Branch', color: '#D97706' },
+  done:             { label: '🚚 Start Delivery',                    color: '#2563EB' },
+  out_for_delivery: { label: '✅ Car Delivered',                     color: '#15803D' },
+}
 
-const REQUESTS = [
-  { id: 1, plate: 'RAC 123 A', customer: 'Sandrine U.', service: 'Full Body Wash', address: 'KN 4 Ave, Nyarugenge', distance: '2.3 km', price: 8000, eta: '8 min' },
-  { id: 2, plate: 'RAD 789 C', customer: 'Jean C.', service: 'Premium Detail', address: 'KG 11 Ave, Gasabo', distance: '4.1 km', price: 18000, eta: '14 min' },
-]
+const WASH_STATUSES = ['en_route_branch', 'received', 'washing', 'rinsing', 'drying']
 
-const f = (size, weight = 400, color = '#1E293B') => ({ fontFamily: "'DM Sans',sans-serif", fontSize: size, fontWeight: weight, color })
+const STATUS_LABEL = {
+  pending: 'Pending', confirmed: 'Confirmed',
+  driver_assigned: 'Assigned — Action Required',
+  en_route_pickup: 'Heading to Customer',
+  at_customer: 'At Customer Location',
+  en_route_branch: 'Taking Car to Branch',
+  received: 'Car at Branch',
+  washing: 'Washing', rinsing: 'Rinsing', drying: 'Drying',
+  done: 'Wash Complete',
+  out_for_delivery: 'Delivering',
+  delivered: 'Delivered',
+  collected: 'Customer Collected',
+}
+
+const f = (size, weight = 400, color = C.text) => ({ fontFamily: "'DM Sans',sans-serif", fontSize: size, fontWeight: weight, color })
 const card = (extra = {}) => ({ background: C.surface, borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,.07)', padding: 20, ...extra })
 
-const RequestsIcon = ({ size = 20 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.95 12a19.79 19.79 0 01-3.07-8.67A2 2 0 012.88 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L7.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
-const ActiveIcon  = ({ size = 20 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
-const EarningsIcon = ({ size = 20 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
-const LogoutIcon  = ({ size = 16 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+/* ─── Icons ──────────────────────────────────────────────────────────────── */
+const AvailableIcon = () => <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12l2 2 4-4"/></svg>
+const JobsIcon      = () => <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+const ActiveIcon    = () => <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+const DoneIcon      = () => <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+const LogoutIcon    = () => <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+const RefreshIcon   = () => <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
 
 function useDesktop(bp = 900) {
-  const [d, setD] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= bp : true)
+  const [d, setD] = useState(() => window.innerWidth >= bp)
   useEffect(() => {
     const mq = window.matchMedia(`(min-width: ${bp}px)`)
     const h = e => setD(e.matches)
@@ -42,11 +56,19 @@ function useDesktop(bp = 900) {
   return d
 }
 
-function Sidebar({ page, setPage, driverName, isOnline, setIsOnline, logout }) {
+const mapBooking = b => ({
+  ...b,
+  plate: b.vehicle_plate || `#${b.id}`,
+  vehicle_info: [b.vehicle_make, b.vehicle_model, b.vehicle_color].filter(Boolean).join(' · '),
+})
+
+/* ─── Sidebar ────────────────────────────────────────────────────────────── */
+function Sidebar({ page, setPage, driverName, availableCount, activeCount, completedCount, logout }) {
   const nav = [
-    { id: 'requests', label: 'Requests', Icon: RequestsIcon },
-    { id: 'active',   label: 'Active Job', Icon: ActiveIcon },
-    { id: 'earnings', label: 'Earnings',  Icon: EarningsIcon },
+    { id: 'available',  label: 'Available Pickups', Icon: AvailableIcon, count: availableCount },
+    { id: 'active',     label: 'My Jobs',           Icon: JobsIcon,      count: activeCount },
+    { id: 'inprogress', label: 'In Progress',       Icon: ActiveIcon,    count: null },
+    { id: 'completed',  label: 'Completed',         Icon: DoneIcon,      count: completedCount },
   ]
   return (
     <aside style={{ width: 240, minHeight: '100vh', background: C.sidebar, display: 'flex', flexDirection: 'column', flexShrink: 0, position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}>
@@ -55,12 +77,15 @@ function Sidebar({ page, setPage, driverName, isOnline, setIsOnline, logout }) {
         <div style={f(11, 400, 'rgba(255,255,255,.35)')}>Driver Portal</div>
       </div>
       <nav style={{ flex: 1, padding: '4px 12px' }}>
-        {nav.map(({ id, label, Icon }) => {
+        {nav.map(({ id, label, Icon, count }) => {
           const active = page === id
           return (
-            <button key={id} onClick={() => setPage(id)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 11, padding: '10px 14px', borderRadius: 9, marginBottom: 2, cursor: 'pointer', textAlign: 'left', background: active ? 'rgba(255,255,255,.11)' : 'none', border: `1px solid ${active ? 'rgba(255,255,255,.16)' : 'transparent'}`, color: active ? 'white' : 'rgba(255,255,255,.45)', fontFamily: "'DM Sans',sans-serif", fontSize: 14, fontWeight: active ? 600 : 400, transition: 'all 150ms' }}>
-              <Icon size={18} />{label}
-              {active && <div style={{ marginLeft: 'auto', width: 6, height: 6, borderRadius: '50%', background: C.accent }} />}
+            <button key={id} onClick={() => setPage(id)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 11, padding: '10px 14px', borderRadius: 9, marginBottom: 2, cursor: 'pointer', textAlign: 'left', background: active ? 'rgba(255,255,255,.11)' : 'none', border: `1px solid ${active ? 'rgba(255,255,255,.16)' : 'transparent'}`, color: active ? 'white' : 'rgba(255,255,255,.45)', fontFamily: "'DM Sans',sans-serif", fontSize: 14, fontWeight: active ? 600 : 400 }}>
+              <Icon />
+              {label}
+              {count != null && count > 0 && (
+                <span style={{ marginLeft: 'auto', background: C.accent, color: '#1a1a2e', fontSize: 10, fontWeight: 800, padding: '1px 7px', borderRadius: 9999 }}>{count}</span>
+              )}
             </button>
           )
         })}
@@ -70,35 +95,30 @@ function Sidebar({ page, setPage, driverName, isOnline, setIsOnline, logout }) {
           <div style={f(13, 600, 'rgba(255,255,255,.9)')}>{driverName}</div>
           <div style={f(11, 400, 'rgba(255,255,255,.35)')}>Driver</div>
         </div>
-        <button onClick={() => setIsOnline(o => !o)} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', borderRadius: 8, padding: '8px 12px', cursor: 'pointer', marginBottom: 8, transition: 'all 150ms', background: isOnline ? 'rgba(34,197,94,.13)' : 'rgba(255,255,255,.05)', border: `1px solid ${isOnline ? 'rgba(34,197,94,.28)' : 'rgba(255,255,255,.09)'}` }}>
-          <div style={{ width: 7, height: 7, borderRadius: '50%', background: isOnline ? C.success : 'rgba(255,255,255,.25)', flexShrink: 0 }} />
-          <span style={f(12, 600, isOnline ? '#86EFAC' : 'rgba(255,255,255,.35)')}>{isOnline ? 'Online' : 'Offline'}</span>
-          <div style={{ marginLeft: 'auto', width: 32, height: 18, borderRadius: 9, background: isOnline ? 'rgba(34,197,94,.35)' : 'rgba(255,255,255,.1)', position: 'relative', flexShrink: 0 }}>
-            <div style={{ position: 'absolute', top: 2, left: isOnline ? 14 : 2, width: 14, height: 14, borderRadius: '50%', background: isOnline ? C.success : 'rgba(255,255,255,.3)', transition: 'left 200ms' }} />
-          </div>
-        </button>
         <button onClick={logout} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 4px', fontFamily: "'DM Sans',sans-serif", fontSize: 13, color: 'rgba(255,255,255,.35)' }}>
-          <LogoutIcon size={15} />Logout
+          <LogoutIcon />Logout
         </button>
       </div>
     </aside>
   )
 }
 
+/* ─── Bottom nav (mobile) ────────────────────────────────────────────────── */
 function BottomNav({ page, setPage }) {
   const tabs = [
-    { id: 'requests', label: 'Requests', Icon: RequestsIcon },
-    { id: 'active',   label: 'Active',   Icon: ActiveIcon },
-    { id: 'earnings', label: 'Earnings', Icon: EarningsIcon },
+    { id: 'available',  label: 'Available', Icon: AvailableIcon },
+    { id: 'active',     label: 'My Jobs',   Icon: JobsIcon },
+    { id: 'inprogress', label: 'Progress',  Icon: ActiveIcon },
+    { id: 'completed',  label: 'Done',      Icon: DoneIcon },
   ]
   return (
     <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: C.surface, borderTop: `1px solid ${C.border}`, display: 'flex', zIndex: 100 }}>
       {tabs.map(({ id, label, Icon }) => {
         const active = page === id
         return (
-          <button key={id} onClick={() => setPage(id)} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '10px 0 9px', background: 'none', border: 'none', cursor: 'pointer', color: active ? C.primary : C.dim, position: 'relative', transition: 'color 150ms' }}>
+          <button key={id} onClick={() => setPage(id)} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '10px 0 9px', background: 'none', border: 'none', cursor: 'pointer', color: active ? C.primary : C.dim, position: 'relative' }}>
             {active && <div style={{ position: 'absolute', top: 0, width: 36, height: 2, borderRadius: 1, background: C.primary }} />}
-            <Icon size={22} />
+            <Icon />
             <span style={{ fontSize: 10, fontWeight: active ? 700 : 400 }}>{label}</span>
           </button>
         )
@@ -107,356 +127,467 @@ function BottomNav({ page, setPage }) {
   )
 }
 
-function MapSVG({ showRoute = false, milestone = null, height = 260, fullWidth = false }) {
+/* ─── GPS pill ───────────────────────────────────────────────────────────── */
+function GPSIndicator({ tracking }) {
   return (
-    <div style={{ width: '100%', height, background: '#d4e9f0', position: 'relative', overflow: 'hidden', borderRadius: fullWidth ? 0 : 10 }}>
-      <svg width="100%" height="100%" viewBox="0 0 900 300" preserveAspectRatio="xMidYMid slice" style={{ position: 'absolute', inset: 0 }}>
-        <rect width="900" height="300" fill="#d4e9f0"/>
-        <line x1="0" y1="150" x2="900" y2="150" stroke="#c0d8e4" strokeWidth="22"/>
-        <line x1="450" y1="0" x2="450" y2="300" stroke="#c0d8e4" strokeWidth="16"/>
-        <line x1="0" y1="75" x2="900" y2="225" stroke="#c0d8e4" strokeWidth="9"/>
-        <line x1="0" y1="150" x2="900" y2="150" stroke="white" strokeWidth="2" strokeDasharray="28,18"/>
-        <line x1="450" y1="0" x2="450" y2="300" stroke="white" strokeWidth="2" strokeDasharray="28,18"/>
-        <circle cx="140" cy="220" r="22" fill="#b8d9b0" opacity=".7"/>
-        <circle cx="760" cy="80" r="18" fill="#b8d9b0" opacity=".7"/>
-        {showRoute && <path d="M 130 215 Q 350 150 450 150 Q 640 150 770 82" stroke={C.accent} strokeWidth="5" fill="none" strokeDasharray="14,8" strokeLinecap="round"/>}
-        <circle cx="130" cy="215" r="20" fill={C.secondary} opacity=".9"/>
-        <circle cx="130" cy="215" r="8" fill="white"/>
-        <circle cx="770" cy="82" r="20" fill={C.primary} opacity=".9"/>
-        <circle cx="770" cy="82" r="8" fill="white"/>
-        {showRoute && <>
-          <circle cx="450" cy="150" r="24" fill={C.accent} opacity=".2"/>
-          <circle cx="450" cy="150" r="15" fill={C.accent}/>
-          <circle cx="450" cy="150" r="6" fill="white"/>
-        </>}
-      </svg>
-      <div style={{ position: 'absolute', top: 12, left: 12, display: 'flex', flexDirection: 'column', gap: 5 }}>
-        {[['Customer', C.secondary], ['Branch', C.primary], ...(showRoute ? [['You', C.accent]] : [])].map(([label, color]) => (
-          <div key={label} style={{ background: 'rgba(255,255,255,.92)', borderRadius: 8, padding: '4px 10px', fontSize: 11, color: C.sub, display: 'flex', alignItems: 'center', gap: 5 }}>
-            <div style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }}/>{label}
-          </div>
-        ))}
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: tracking ? '#DCFCE7' : '#F3F4F6', borderRadius: 9999, padding: '5px 12px', fontSize: 12, fontWeight: 600, color: tracking ? '#15803D' : '#6B7280', fontFamily: "'DM Sans',sans-serif" }}>
+      <span style={{ width: 8, height: 8, borderRadius: '50%', background: tracking ? '#22C55E' : '#9CA3AF', animation: tracking ? 'gpsPulse 1.5s ease-in-out infinite' : 'none', display: 'inline-block', flexShrink: 0 }} />
+      {tracking ? 'GPS Active' : 'GPS Off'}
+    </div>
+  )
+}
+
+/* ─── Wash Phase Waiting Card ────────────────────────────────────────────── */
+function WashWaiting({ booking }) {
+  const washProgress = ['received', 'washing', 'rinsing', 'drying', 'done']
+  const idx = washProgress.indexOf(booking.status)
+
+  return (
+    <div style={{ ...card(), borderLeft: '4px solid #8B5CF6', marginBottom: 16 }}>
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 20, fontWeight: 700, marginBottom: 4 }}>{booking.plate}</div>
+        <div style={f(13, 400, C.sub)}>{booking.vehicle_info}</div>
+        <div style={f(12, 400, C.dim)}>Customer: {booking.customer_name}</div>
       </div>
-      {milestone && <div style={{ position: 'absolute', bottom: 12, right: 12, background: 'rgba(26,82,118,.92)', color: 'white', borderRadius: 8, padding: '5px 14px', fontSize: 12, fontWeight: 700 }}>{milestone}</div>}
-    </div>
-  )
-}
 
-function OfflineState() {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, padding: 48, textAlign: 'center', flex: 1 }}>
-      <div style={{ width: 80, height: 80, borderRadius: '50%', background: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36 }}>⭕</div>
-      <div style={f(20, 700)}>You're Offline</div>
-      <div style={f(14, 400, C.sub)}>Go online to start receiving pickup requests from customers.</div>
-    </div>
-  )
-}
-
-function DesktopRequests({ setPage, setActiveReq, isOnline }) {
-  const [accepting, setAccepting] = useState(null)
-  if (!isOnline) return <OfflineState />
-
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-      {REQUESTS.map(req => (
-        <div key={req.id} style={card({ padding: 0, overflow: 'hidden' })}>
-          <MapSVG height={200} />
-          <div style={{ padding: 20 }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
-              <div>
-                <div style={f(18, 700)}>{req.plate}</div>
-                <div style={f(13, 500, C.sub)}>{req.customer}</div>
-                <div style={f(12, 400, C.dim)}>📍 {req.address}</div>
-                <div style={f(12, 400, C.dim)}>{req.service}</div>
+      <div style={{ background: '#F5F3FF', borderRadius: 10, padding: '12px 16px', marginBottom: 14 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#7C3AED', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8, fontFamily: "'DM Sans',sans-serif" }}>Wash Progress</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 0, overflowX: 'auto' }}>
+          {washProgress.map((s, i) => (
+            <div key={s} style={{ display: 'contents' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, flexShrink: 0 }}>
+                <div style={{ width: 20, height: 20, borderRadius: '50%', background: i < idx ? '#7C3AED' : i === idx ? '#F59E0B' : '#E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  {i < idx && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round"><path d="M20 6L9 17l-5-5" /></svg>}
+                  {i === idx && <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'white', animation: 'gpsPulse 1.5s ease-in-out infinite' }} />}
+                </div>
+                <span style={{ fontSize: 9, whiteSpace: 'nowrap', color: i <= idx ? '#7C3AED' : '#9CA3AF', fontWeight: i === idx ? 700 : 400, fontFamily: "'DM Sans',sans-serif" }}>
+                  {s === 'done' ? 'Done' : s.charAt(0).toUpperCase() + s.slice(1)}
+                </span>
               </div>
-              <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 20, fontWeight: 700, color: C.primary }}>RWF {req.price.toLocaleString()}</div>
-                <div style={f(11, 400, C.dim)}>{req.distance} · ~{req.eta}</div>
-              </div>
+              {i < washProgress.length - 1 && (
+                <div style={{ flex: 1, height: 2, minWidth: 10, background: i < idx ? '#7C3AED' : '#E2E8F0', margin: '0 2px', marginBottom: 14 }} />
+              )}
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <button style={{ height: 44, background: '#F1F5F9', color: C.sub, fontSize: 14, fontWeight: 600, borderRadius: 10, border: 'none', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>Decline</button>
-              <button onClick={() => { setAccepting(req.id); setTimeout(() => { setActiveReq(req); setPage('active') }, 700) }} disabled={accepting === req.id} style={{ height: 44, background: accepting === req.id ? C.primaryDark : C.accent, color: accepting === req.id ? 'white' : C.text, fontSize: 14, fontWeight: 700, borderRadius: 10, border: 'none', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif", boxShadow: '0 4px 12px rgba(243,156,18,.2)', transition: 'all 150ms' }}>
-                {accepting === req.id ? 'Accepting…' : 'Accept'}
-              </button>
-            </div>
-          </div>
+          ))}
         </div>
-      ))}
+      </div>
+
+      {booking.status !== 'done' && (
+        <div style={{ background: C.bg, borderRadius: 10, padding: '12px 14px', fontSize: 13, color: C.sub, fontFamily: "'DM Sans',sans-serif" }}>
+          ⏳ The wash team is working on the car. Please wait.
+        </div>
+      )}
+      {booking.status === 'done' && booking.return_method === 'delivery' && (
+        <div style={{ background: '#FEF3C7', borderRadius: 10, padding: '12px 14px', fontSize: 13, color: '#92400E', fontWeight: 600, fontFamily: "'DM Sans',sans-serif" }}>
+          ✅ Wash complete! Customer chose delivery. Go collect and deliver.
+        </div>
+      )}
+      {booking.status === 'done' && !booking.return_method && (
+        <div style={{ background: '#EFF6FF', borderRadius: 10, padding: '12px 14px', fontSize: 13, color: '#1D4ED8', fontFamily: "'DM Sans',sans-serif" }}>
+          ✅ Wash complete! Waiting for customer to choose delivery or self-pickup.
+        </div>
+      )}
+      {booking.status === 'done' && booking.return_method === 'self_pickup' && (
+        <div style={{ background: '#D1FAE5', borderRadius: 10, padding: '12px 14px', fontSize: 13, color: '#065F46', fontFamily: "'DM Sans',sans-serif" }}>
+          ✅ Wash complete — customer will self-pickup. Job done for you!
+        </div>
+      )}
     </div>
   )
 }
 
-function MobileRequests({ setPage, setActiveReq, isOnline }) {
-  const [accepting, setAccepting] = useState(null)
-  if (!isOnline) return <div style={{ paddingBottom: 80 }}><OfflineState /></div>
+/* ─── Active Job Card ────────────────────────────────────────────────────── */
+function ActiveJobCard({ booking, onAction, advancing }) {
+  const busy   = advancing === booking.id
+  const action = DRIVER_ACTIONS[booking.status]
+  const isWaiting = WASH_STATUSES.includes(booking.status)
+
+  if (isWaiting) return <WashWaiting booking={booking} />
+
+  const phaseColors = {
+    driver_assigned: '#2563EB', en_route_pickup: '#7C3AED',
+    at_customer: '#D97706', done: '#1D4ED8', out_for_delivery: '#1D4ED8',
+  }
+  const phaseColor = phaseColors[booking.status] || C.primary
+  const phaseLabel = STATUS_LABEL[booking.status] || booking.status.replace(/_/g, ' ')
 
   return (
-    <div style={{ paddingBottom: 80 }}>
-      <div style={{ padding: '16px 16px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={f(16, 700)}>Incoming Requests</div>
-        <span style={f(12, 400, C.sub)}>{REQUESTS.length} nearby</span>
+    <div style={{ ...card(), borderLeft: `4px solid ${phaseColor}`, marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, gap: 10 }}>
+        <div>
+          <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 22, fontWeight: 700 }}>{booking.plate}</div>
+          <div style={f(13, 400, C.sub)}>{booking.vehicle_info}</div>
+        </div>
+        <div style={{ background: `${phaseColor}18`, color: phaseColor, fontSize: 11, fontWeight: 700, padding: '4px 12px', borderRadius: 9999, maxWidth: 130, wordBreak: 'break-word', fontFamily: "'DM Sans',sans-serif", flexShrink: 0, textAlign: 'center' }}>
+          {phaseLabel}
+        </div>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '12px 16px 0' }}>
-        {REQUESTS.map(req => (
-          <div key={req.id} style={card({ padding: 0, overflow: 'hidden' })}>
-            <MapSVG height={160} />
-            <div style={{ padding: 16 }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
-                <div>
-                  <div style={f(17, 700)}>{req.plate}</div>
-                  <div style={f(13, 400, C.sub)}>{req.customer}</div>
-                  <div style={f(12, 400, C.dim)}>{req.address}</div>
-                </div>
-                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 18, fontWeight: 700, color: C.primary }}>RWF {req.price.toLocaleString()}</div>
-                  <div style={f(11, 400, C.dim)}>{req.distance} · ~{req.eta}</div>
-                </div>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <button style={{ height: 52, background: '#F1F5F9', color: C.sub, fontSize: 15, fontWeight: 600, borderRadius: 12, border: 'none', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>Decline</button>
-                <button onClick={() => { setAccepting(req.id); setTimeout(() => { setActiveReq(req); setPage('active') }, 700) }} disabled={accepting === req.id} style={{ height: 52, background: accepting === req.id ? C.primaryDark : C.accent, color: accepting === req.id ? 'white' : C.text, fontSize: 15, fontWeight: 700, borderRadius: 12, border: 'none', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif", boxShadow: '0 4px 12px rgba(243,156,18,.2)', transition: 'all 150ms' }}>
-                  {accepting === req.id ? 'Accepting…' : 'Accept'}
-                </button>
-              </div>
-            </div>
+
+      <div style={{ background: C.bg, borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
+        {[
+          ['Customer', booking.customer_name],
+          ['Phone',    booking.customer_phone],
+          ['Service',  booking.service_name],
+          ['Branch',   booking.branch_name],
+          ...(booking.pickup_address ? [['Pickup Addr', booking.pickup_address]] : []),
+          ...(booking.return_method  ? [['Return',      booking.return_method.replace('_', ' ')]] : []),
+        ].map(([k, v]) => v ? (
+          <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '3px 0', fontFamily: "'DM Sans',sans-serif" }}>
+            <span style={{ color: C.sub, minWidth: 80, flexShrink: 0 }}>{k}</span>
+            <span style={{ fontWeight: 500, color: C.text, textAlign: 'right', textTransform: 'capitalize', flex: 1, marginLeft: 8 }}>{v}</span>
           </div>
-        ))}
+        ) : null)}
       </div>
+
+      {action && (
+        <button onClick={() => onAction(booking)} disabled={busy} style={{
+          width: '100%', padding: '14px 0', background: busy ? '#CBD5E1' : action.color,
+          color: 'white', border: 'none', borderRadius: 10, cursor: busy ? 'not-allowed' : 'pointer',
+          fontFamily: "'DM Sans',sans-serif", fontSize: 14, fontWeight: 700,
+          boxShadow: busy ? 'none' : '0 4px 14px rgba(0,0,0,.15)', transition: 'all 150ms',
+        }}>
+          {busy ? 'Updating...' : action.label}
+        </button>
+      )}
+
+      {booking.status === 'done' && booking.return_method === 'self_pickup' && (
+        <div style={{ background: '#D1FAE5', borderRadius: 10, padding: '12px 14px', fontSize: 13, fontWeight: 600, color: '#065F46', textAlign: 'center', fontFamily: "'DM Sans',sans-serif" }}>
+          ✅ Customer collecting themselves — job complete!
+        </div>
+      )}
     </div>
   )
 }
 
-function DesktopActiveJob({ req, setPage }) {
-  const [mIdx, setMIdx] = useState(0)
-  const current = MILESTONES[mIdx]
-  const isDone = mIdx >= MILESTONES.length - 1
+/* ─── Available Pickups Tab ──────────────────────────────────────────────── */
+function AvailableTab({ pickups, onAccept, accepting, loading, onRefresh }) {
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', ...f(14, 400, C.dim) }}>Loading available pickups...</div>
+
+  if (pickups.length === 0) {
+    return (
+      <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+        <div style={{ fontSize: 48, marginBottom: 12 }}>📡</div>
+        <div style={f(16, 600, C.sub)}>No pickups available right now</div>
+        <div style={f(13, 400, C.dim)}>Broadcast pickup jobs appear here when customers book</div>
+        <button onClick={onRefresh} style={{ marginTop: 16, padding: '8px 20px', background: C.primary, color: 'white', border: 'none', borderRadius: 9, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif", fontSize: 13, fontWeight: 600 }}>
+          Refresh
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div>
-      <MapSVG showRoute height={380} fullWidth />
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginTop: 24 }}>
-        <div style={card()}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 }}>
-            <div>
-              <div style={f(22, 700)}>{req.plate}</div>
-              <div style={f(14, 500, C.sub)}>{req.customer} · {req.service}</div>
-              <div style={f(13, 400, C.dim)}>📍 {req.address}</div>
-            </div>
-            <div style={{ textAlign: 'right', flexShrink: 0 }}>
-              <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 22, fontWeight: 700, color: C.primary }}>RWF {Number(req.price).toLocaleString()}</div>
-              <div style={f(12, 400, C.dim)}>{req.distance}</div>
-            </div>
-          </div>
-          <button onClick={() => setPage('requests')} style={{ width: '100%', height: 44, background: '#F1F5F9', border: 'none', borderRadius: 10, cursor: 'pointer', ...f(14, 600, C.sub) }}>
-            ← Back to Requests
-          </button>
-        </div>
-
-        <div style={card()}>
-          <div style={f(11, 700, C.sub)}>JOURNEY MILESTONES</div>
-          <div style={{ marginTop: 12 }}>
-            {MILESTONES.map((m, i) => {
-              const done = i < mIdx, active = i === mIdx, future = i > mIdx
-              return (
-                <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 0', borderBottom: i < MILESTONES.length - 1 ? `1px solid ${C.border}` : 'none' }}>
-                  <div style={{ width: 30, height: 30, borderRadius: '50%', flexShrink: 0, background: done ? C.primary : active ? C.accent : C.border, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {done && <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round"><path d="M20 6L9 17l-5-5"/></svg>}
-                    {active && <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'white' }} />}
-                  </div>
-                  <span style={f(14, active ? 700 : future ? 400 : 500, active ? C.text : future ? C.dim : C.sub)}>{m.label}</span>
-                  {active && <span style={{ marginLeft: 'auto', ...f(11, 700, C.accent) }}>← Now</span>}
-                  {done && <span style={{ marginLeft: 'auto', ...f(12, 400, C.dim) }}>✓</span>}
-                </div>
-              )
-            })}
-          </div>
-          <button onClick={() => !isDone && setMIdx(i => i + 1)} style={{ width: '100%', height: 52, marginTop: 16, border: 'none', borderRadius: 10, cursor: isDone ? 'default' : 'pointer', fontFamily: "'DM Sans',sans-serif", fontSize: 15, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'all 150ms', background: isDone ? C.successBg : C.accent, color: isDone ? C.successText : C.text, boxShadow: isDone ? 'none' : '0 4px 16px rgba(243,156,18,.25)' }}>
-            {isDone ? <><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M20 6L9 17l-5-5"/></svg>Job Delivered!</> : `Mark as ${MILESTONES[mIdx + 1]?.label || ''}`}
-          </button>
-        </div>
+      <div style={{ ...f(11, 700, C.sub), textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>
+        {pickups.length} OPEN PICKUP{pickups.length !== 1 ? 'S' : ''} — FIRST COME, FIRST SERVED
       </div>
+      {pickups.map(p => {
+        const busy = accepting === p.id
+        return (
+          <div key={p.id} style={{ ...card(), borderLeft: '4px solid #F59E0B', marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, gap: 10 }}>
+              <div>
+                <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 22, fontWeight: 700 }}>{p.plate}</div>
+                <div style={f(13, 400, C.sub)}>{p.vehicle_info}</div>
+              </div>
+              <div style={{ background: '#FEF3C7', color: '#92400E', fontSize: 11, fontWeight: 700, padding: '4px 12px', borderRadius: 9999, fontFamily: "'DM Sans',sans-serif", flexShrink: 0 }}>
+                OPEN
+              </div>
+            </div>
+            <div style={{ background: C.bg, borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
+              {[
+                ['Customer', p.customer_name],
+                ['Service',  p.service_name],
+                ['Branch',   p.branch_name],
+                ['Date',     p.date],
+                ['Pickup Address', p.pickup_address],
+              ].map(([k, v]) => v ? (
+                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '3px 0', fontFamily: "'DM Sans',sans-serif" }}>
+                  <span style={{ color: C.sub, minWidth: 80, flexShrink: 0 }}>{k}</span>
+                  <span style={{ fontWeight: 500, color: C.text, textAlign: 'right', flex: 1, marginLeft: 8 }}>{v}</span>
+                </div>
+              ) : null)}
+            </div>
+            <button onClick={() => onAccept(p)} disabled={busy} style={{
+              width: '100%', padding: '14px 0', background: busy ? '#CBD5E1' : '#F59E0B',
+              color: busy ? '#888' : '#1a1a2e', border: 'none', borderRadius: 10,
+              cursor: busy ? 'not-allowed' : 'pointer',
+              fontFamily: "'DM Sans',sans-serif", fontSize: 14, fontWeight: 700,
+              boxShadow: busy ? 'none' : '0 4px 14px rgba(245,158,11,.25)', transition: 'all 150ms',
+            }}>
+              {busy ? 'Accepting...' : '🚗 Accept This Pickup'}
+            </button>
+          </div>
+        )
+      })}
     </div>
   )
 }
 
-function MobileActiveJob({ req, setPage }) {
-  const [mIdx, setMIdx] = useState(0)
-  const isDone = mIdx >= MILESTONES.length - 1
+/* ─── Jobs Tab ───────────────────────────────────────────────────────────── */
+function JobsTab({ jobs, onAction, advancing }) {
+  const actionable  = jobs.filter(j => ['driver_assigned', 'en_route_pickup', 'at_customer'].includes(j.status))
+  const waiting     = jobs.filter(j => WASH_STATUSES.includes(j.status))
+  const deliverable = jobs.filter(j => ['done', 'out_for_delivery'].includes(j.status))
+
+  if (jobs.length === 0) {
+    return (
+      <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+        <div style={{ fontSize: 48, marginBottom: 12 }}>🚗</div>
+        <div style={f(16, 600, C.sub)}>No active jobs</div>
+        <div style={f(13, 400, C.dim)}>Go to "Available Pickups" to accept a job</div>
+      </div>
+    )
+  }
 
   return (
-    <div style={{ paddingBottom: 80 }}>
-      <MapSVG showRoute milestone={MILESTONES[mIdx].label} height={240} />
-      <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div style={card()}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
-            <div>
-              <div style={f(18, 700)}>{req.plate}</div>
-              <div style={f(13, 400, C.sub)}>{req.customer} · {req.service}</div>
-              <div style={f(12, 400, C.dim)}>📍 {req.address}</div>
-            </div>
-            <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 18, fontWeight: 700, color: C.primary, flexShrink: 0 }}>RWF {Number(req.price).toLocaleString()}</div>
-          </div>
-        </div>
-        <div style={card()}>
-          <div style={f(11, 700, C.sub)}>JOURNEY MILESTONES</div>
-          <div style={{ marginTop: 12 }}>
-            {MILESTONES.map((m, i) => {
-              const done = i < mIdx, active = i === mIdx, future = i > mIdx
-              return (
-                <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: i < MILESTONES.length - 1 ? `1px solid ${C.border}` : 'none' }}>
-                  <div style={{ width: 30, height: 30, borderRadius: '50%', flexShrink: 0, background: done ? C.primary : active ? C.accent : C.border, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {done && <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round"><path d="M20 6L9 17l-5-5"/></svg>}
-                    {active && <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'white' }} />}
-                  </div>
-                  <span style={f(14, active ? 700 : future ? 400 : 500, active ? C.text : future ? C.dim : C.sub)}>{m.label}</span>
-                  {active && <span style={{ marginLeft: 'auto', ...f(11, 700, C.accent) }}>← Now</span>}
-                  {done && <span style={{ marginLeft: 'auto', ...f(12, 400, C.dim) }}>✓</span>}
-                </div>
-              )
-            })}
-          </div>
-        </div>
-        <button onClick={() => !isDone && setMIdx(i => i + 1)} style={{ width: '100%', height: 64, border: 'none', borderRadius: 14, cursor: isDone ? 'default' : 'pointer', fontFamily: "'DM Sans',sans-serif", fontSize: 18, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, transition: 'all 150ms', background: isDone ? C.successBg : C.accent, color: isDone ? C.successText : C.text, boxShadow: isDone ? 'none' : '0 4px 20px rgba(243,156,18,.25)' }}>
-          {isDone ? <><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M20 6L9 17l-5-5"/></svg>Job Delivered!</> : `Mark as ${MILESTONES[mIdx + 1]?.label || ''}`}
-        </button>
-      </div>
+    <div>
+      {actionable.length > 0 && (
+        <>
+          <div style={{ ...f(11, 700, '#DC2626'), textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>ACTION REQUIRED ({actionable.length})</div>
+          {actionable.map(j => <ActiveJobCard key={j.id} booking={j} onAction={onAction} advancing={advancing} />)}
+        </>
+      )}
+      {waiting.length > 0 && (
+        <>
+          <div style={{ ...f(11, 700, '#7C3AED'), textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10, marginTop: actionable.length ? 12 : 0 }}>WASH IN PROGRESS ({waiting.length})</div>
+          {waiting.map(j => <WashWaiting key={j.id} booking={j} />)}
+        </>
+      )}
+      {deliverable.length > 0 && (
+        <>
+          <div style={{ ...f(11, 700, '#1D4ED8'), textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10, marginTop: (actionable.length || waiting.length) ? 12 : 0 }}>DELIVERY PHASE ({deliverable.length})</div>
+          {deliverable.map(j => <ActiveJobCard key={j.id} booking={j} onAction={onAction} advancing={advancing} />)}
+        </>
+      )}
     </div>
   )
 }
 
-const TRIP_DATA = [
-  { p: 'RAC 123 A', s: 'Full Body Wash', a: 8000, t: '10:45 AM' },
-  { p: 'RAB 456 B', s: 'Premium Detail', a: 18000, t: '09:10 AM' },
-  { p: 'RAE 012 D', s: 'Quick Rinse', a: 3000, t: 'Yesterday' },
-  { p: 'RAF 333 E', s: 'Full Body Wash', a: 8000, t: 'Yesterday' },
-  { p: 'RAG 777 F', s: 'Premium Detail', a: 18000, t: '2 days ago' },
-]
+/* ─── Completed Tab ──────────────────────────────────────────────────────── */
+function CompletedTab({ jobs, isDesktop }) {
+  const done = jobs.filter(j => ['delivered', 'collected'].includes(j.status))
 
-function BarChart() {
-  const vals = [3, 5, 4, 7, 6, 9, 2]
-  const labels = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
-  const max = Math.max(...vals)
+  if (done.length === 0) {
+    return (
+      <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+        <div style={{ fontSize: 48, marginBottom: 12 }}>📋</div>
+        <div style={f(16, 600, C.sub)}>No completed jobs yet</div>
+        <div style={f(13, 400, C.dim)}>Completed deliveries will appear here</div>
+      </div>
+    )
+  }
+
+  if (isDesktop) {
+    const th = { padding: '10px 16px', textAlign: 'left', ...f(11, 600, C.sub), textTransform: 'uppercase', letterSpacing: '0.05em', background: '#F8FAFC', borderBottom: `1px solid ${C.border}` }
+    const td = { padding: '12px 16px', borderBottom: `1px solid ${C.border}` }
+    return (
+      <div style={card({ padding: 0, overflow: 'hidden' })}>
+        <div style={{ padding: '16px 20px 14px', borderBottom: `1px solid ${C.border}` }}>
+          <div style={f(16, 700)}>Completed Jobs</div>
+          <div style={f(13, 400, C.sub)}>{done.length} deliveries completed</div>
+        </div>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead><tr>{['Plate', 'Customer', 'Service', 'Branch', 'Status'].map(h => <th key={h} style={th}>{h}</th>)}</tr></thead>
+          <tbody>
+            {done.map(j => (
+              <tr key={j.id}>
+                <td style={td}><span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{j.plate}</span></td>
+                <td style={td}><span style={f(13, 400, C.sub)}>{j.customer_name}</span></td>
+                <td style={td}><span style={f(13)}>{j.service_name}</span></td>
+                <td style={td}><span style={f(13, 400, C.sub)}>{j.branch_name}</span></td>
+                <td style={td}><span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 9999, background: '#D1FAE5', color: '#065F46', textTransform: 'capitalize', fontFamily: "'DM Sans',sans-serif" }}>{j.status}</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 100, marginTop: 16 }}>
-      {labels.map((d, i) => (
-        <div key={d} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
-          <div style={{ width: '100%', borderRadius: '5px 5px 0 0', height: `${(vals[i] / max) * 80}px`, background: i === 5 ? C.accent : C.primary, opacity: i === 6 ? 0.35 : 1, transition: 'height 300ms' }} />
-          <span style={f(10, i === 5 ? 700 : 400, i === 5 ? C.accent : C.dim)}>{d}</span>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {done.map(j => (
+        <div key={j.id} style={{ ...card(), display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontFamily: 'monospace', fontSize: 16, fontWeight: 700 }}>{j.plate}</div>
+            <div style={f(12, 400, C.sub)}>{j.service_name} · {j.customer_name}</div>
+            <div style={f(11, 400, C.dim)}>{j.branch_name}</div>
+          </div>
+          <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 9999, background: '#D1FAE5', color: '#065F46', textTransform: 'capitalize', fontFamily: "'DM Sans',sans-serif" }}>{j.status}</span>
         </div>
       ))}
     </div>
   )
 }
 
-function DesktopEarnings() {
-  const stats = [['Today', 'RWF 18,000', C.accent], ['This Week', 'RWF 94,500', C.primary], ['This Month', 'RWF 312,000', C.secondary], ['Total Trips', '12', C.success]]
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      <div style={{ display: 'flex', gap: 20 }}>
-        {stats.map(([l, v, c]) => (
-          <div key={l} style={{ ...card({ padding: '22px 24px' }), flex: 1, textAlign: 'center' }}>
-            <div style={f(11, 700, C.sub)}>{l.toUpperCase()}</div>
-            <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 26, fontWeight: 700, color: c, marginTop: 6 }}>{v}</div>
-          </div>
-        ))}
+/* ─── In Progress Tab ────────────────────────────────────────────────────── */
+function InProgressTab({ jobs }) {
+  const inProgress = jobs.filter(j => WASH_STATUSES.includes(j.status))
+  if (inProgress.length === 0) {
+    return (
+      <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+        <div style={{ fontSize: 48, marginBottom: 12 }}>🫧</div>
+        <div style={f(16, 600, C.sub)}>No cars being washed</div>
+        <div style={f(13, 400, C.dim)}>Cars at the branch will appear here.</div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 20 }}>
-        <div style={card()}>
-          <div style={f(12, 700, C.sub)}>TRIPS THIS WEEK</div>
-          <BarChart />
-        </div>
-        <div style={card({ padding: 0, overflow: 'hidden' })}>
-          <div style={{ padding: '16px 20px 14px', borderBottom: `1px solid ${C.border}` }}>
-            <div style={f(15, 700)}>Recent Trips</div>
-          </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>{['Plate No.', 'Service', 'Time', 'Amount'].map(h => <th key={h} style={{ padding: '10px 16px', textAlign: 'left', ...f(11, 600, C.sub), textTransform: 'uppercase', letterSpacing: '0.05em', background: '#F8FAFC', borderBottom: `1px solid ${C.border}` }}>{h}</th>)}</tr>
-            </thead>
-            <tbody>
-              {TRIP_DATA.map((t, i) => (
-                <tr key={i} style={{ borderBottom: i < TRIP_DATA.length - 1 ? `1px solid ${C.border}` : 'none' }}>
-                  <td style={{ padding: '12px 16px' }}><span style={f(14, 600)}>{t.p}</span></td>
-                  <td style={{ padding: '12px 16px' }}><span style={f(13, 400)}>{t.s}</span></td>
-                  <td style={{ padding: '12px 16px' }}><span style={f(13, 400, C.sub)}>{t.t}</span></td>
-                  <td style={{ padding: '12px 16px' }}><span style={f(14, 700, C.primary)}>RWF {t.a.toLocaleString()}</span></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  )
+    )
+  }
+  return <div>{inProgress.map(j => <WashWaiting key={j.id} booking={j} />)}</div>
 }
 
-function MobileEarnings() {
-  return (
-    <div style={{ padding: 16, paddingBottom: 80, display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div style={f(18, 700)}>Earnings</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        {[['Today', 'RWF 18,000', C.accent], ['This Week', 'RWF 94,500', C.primary], ['This Month', 'RWF 312k', C.secondary], ['Trips', '12', C.success]].map(([l, v, c]) => (
-          <div key={l} style={card({ padding: 14 })}>
-            <div style={f(10, 700, C.sub)}>{l.toUpperCase()}</div>
-            <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 20, fontWeight: 700, color: c, marginTop: 4 }}>{v}</div>
-          </div>
-        ))}
-      </div>
-      <div style={card()}>
-        <div style={f(12, 700, C.sub)}>TRIPS THIS WEEK</div>
-        <BarChart />
-      </div>
-      <div style={card()}>
-        <div style={{ ...f(12, 700, C.sub), marginBottom: 12 }}>RECENT TRIPS</div>
-        {TRIP_DATA.map((t, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 0', borderBottom: i < TRIP_DATA.length - 1 ? `1px solid ${C.border}` : 'none' }}>
-            <div>
-              <div style={f(13, 600)}>{t.p}</div>
-              <div style={f(11, 400, C.dim)}>{t.s} · {t.t}</div>
-            </div>
-            <div style={f(14, 700, C.primary)}>RWF {t.a.toLocaleString()}</div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
+/* ─── Main component ─────────────────────────────────────────────────────── */
 export default function DriverPortal() {
   const { user, logout } = useAuth()
   const isDesktop = useDesktop()
-  const [page, setPage] = useState('requests')
-  const [activeReq, setActiveReq] = useState(null)
-  const [isOnline, setIsOnline] = useState(true)
 
-  const navigate = (p) => {
-    if (p === 'active' && !activeReq) return
-    setPage(p)
+  const [page, setPage]                     = useState('available')
+  const [jobs, setJobs]                     = useState([])
+  const [availablePickups, setAvailablePickups] = useState([])
+  const [loading, setLoading]               = useState(true)
+  const [availLoading, setAvailLoading]     = useState(false)
+  const [apiError, setApiError]             = useState('')
+  const [refreshing, setRefreshing]         = useState(false)
+  const [advancing, setAdvancing]           = useState(null)
+  const [accepting, setAccepting]           = useState(null)
+  const [gpsTracking, setGpsTracking]       = useState(false)
+  const gpsWatchRef = useRef(null)
+
+  const fetchJobs = useCallback(async (quiet = false) => {
+    if (!quiet) setRefreshing(true)
+    try {
+      const { data } = await client.get('bookings/')
+      setJobs((data.results ?? data).map(mapBooking))
+      setApiError('')
+    } catch (err) {
+      const s = err.response?.status
+      const msg = s === 401 ? 'Session expired — please log in again.'
+        : s === 403 ? 'Your account does not have driver access.'
+        : !err.response ? 'Cannot reach server. Check your connection.'
+        : `Server error (${s}).`
+      setApiError(msg)
+    }
+    setRefreshing(false)
+    setLoading(false)
+  }, [])
+
+  const fetchAvailable = useCallback(async () => {
+    setAvailLoading(true)
+    try {
+      const { data } = await client.get('bookings/available-pickups/')
+      setAvailablePickups((data.results ?? data).map(mapBooking))
+    } catch {
+      setAvailablePickups([])
+    }
+    setAvailLoading(false)
+  }, [])
+
+  useEffect(() => {
+    fetchJobs(false)
+    const timer = setInterval(() => fetchJobs(true), 15000)
+    return () => clearInterval(timer)
+  }, [fetchJobs])
+
+  useEffect(() => {
+    fetchAvailable()
+    const timer = setInterval(fetchAvailable, 15000)
+    return () => clearInterval(timer)
+  }, [fetchAvailable])
+
+  useEffect(() => {
+    if (!navigator.geolocation) return
+    const sendLocation = pos => {
+      client.patch('accounts/driver/location/', {
+        latitude: pos.coords.latitude,
+        longitude: pos.coords.longitude,
+      }).catch(() => {})
+    }
+    gpsWatchRef.current = navigator.geolocation.watchPosition(
+      pos => { setGpsTracking(true); sendLocation(pos) },
+      () => setGpsTracking(false),
+      { enableHighAccuracy: true, maximumAge: 10000 },
+    )
+    return () => {
+      if (gpsWatchRef.current != null) navigator.geolocation.clearWatch(gpsWatchRef.current)
+    }
+  }, [])
+
+  const activeJobs    = jobs.filter(j => !['delivered', 'collected', 'cancelled'].includes(j.status))
+  const completedJobs = jobs.filter(j => ['delivered', 'collected'].includes(j.status))
+
+  const handleAction = async booking => {
+    setAdvancing(booking.id)
+    try {
+      const { data } = await client.patch(`bookings/${booking.id}/driver-status/`)
+      setJobs(prev => prev.map(j => j.id === booking.id ? { ...j, status: data.status, return_method: data.return_method } : j))
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Failed to update status.')
+    }
+    setAdvancing(null)
   }
 
-  const activePage = (page === 'active' && !activeReq) ? 'requests' : page
-  const driverName = user?.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : 'Driver'
-
-  const pageTitle = {
-    requests: ['Incoming Requests', 'Accept or decline pickup requests'],
-    active:   ['Active Job', 'Track your current delivery'],
-    earnings: ['Earnings', 'Your trips and revenue'],
+  const handleAccept = async booking => {
+    setAccepting(booking.id)
+    try {
+      await client.post(`bookings/${booking.id}/accept-pickup/`)
+      setAvailablePickups(prev => prev.filter(p => p.id !== booking.id))
+      fetchJobs(false)
+      setPage('active')
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Failed to accept pickup.')
+    }
+    setAccepting(null)
   }
+
+  const doRefresh = () => page === 'available' ? fetchAvailable() : fetchJobs(false)
+  const driverName = user?.full_name || user?.phone || 'Driver'
+
+  const pageContent = () => {
+    if (loading) return <div style={{ padding: 40, textAlign: 'center', ...f(14, 400, C.dim) }}>Loading your jobs...</div>
+    if (apiError && page !== 'available') return (
+      <div style={{ background: '#FEE2E2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 12, padding: '16px 20px', margin: 16 }}>
+        <div style={{ fontWeight: 700, marginBottom: 4, fontFamily: "'DM Sans',sans-serif" }}>Connection Error</div>
+        <div style={{ fontSize: 13, fontFamily: "'DM Sans',sans-serif" }}>{apiError}</div>
+        <button onClick={() => fetchJobs(false)} style={{ marginTop: 12, padding: '8px 16px', background: '#B91C1C', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif", fontSize: 13, fontWeight: 600 }}>Try Again</button>
+      </div>
+    )
+    if (page === 'available')  return <AvailableTab pickups={availablePickups} onAccept={handleAccept} accepting={accepting} loading={availLoading} onRefresh={fetchAvailable} />
+    if (page === 'active')     return <JobsTab jobs={activeJobs} onAction={handleAction} advancing={advancing} />
+    if (page === 'inprogress') return <InProgressTab jobs={jobs} />
+    if (page === 'completed')  return <CompletedTab jobs={completedJobs} isDesktop={isDesktop} />
+    return null
+  }
+
+  const pageTitles = {
+    available:  ['Available Pickups',  `${availablePickups.length} open pickup${availablePickups.length !== 1 ? 's' : ''}`],
+    active:     ['My Jobs',           `${activeJobs.length} active job${activeJobs.length !== 1 ? 's' : ''}`],
+    inprogress: ['In Progress',       'Cars being washed at branch'],
+    completed:  ['Completed',         `${completedJobs.length} deliveries done`],
+  }
+
+  const css = `@keyframes gpsPulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:.4; transform:scale(.75); } }`
 
   if (isDesktop) {
     return (
       <div style={{ display: 'flex', minHeight: '100vh', background: C.bg }}>
-        <Sidebar page={activePage} setPage={navigate} driverName={driverName} isOnline={isOnline} setIsOnline={setIsOnline} logout={logout} />
+        <style>{css}</style>
+        <Sidebar page={page} setPage={setPage} driverName={driverName} availableCount={availablePickups.length} activeCount={activeJobs.length} completedCount={completedJobs.length} logout={logout} />
         <main style={{ flex: 1, padding: '36px 40px', overflowY: 'auto', minWidth: 0 }}>
-          <div style={{ maxWidth: 1200 }}>
-            <div style={{ marginBottom: 28 }}>
-              <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 28, fontWeight: 700, marginBottom: 4, color: C.text }}>{pageTitle[activePage]?.[0]}</div>
-              <div style={f(14, 400, C.sub)}>{pageTitle[activePage]?.[1]}</div>
+          <div style={{ maxWidth: 900 }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 28 }}>
+              <div>
+                <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 28, fontWeight: 700, color: C.text }}>{pageTitles[page]?.[0]}</div>
+                <div style={f(13, 400, C.sub)}>{pageTitles[page]?.[1]}</div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <GPSIndicator tracking={gpsTracking} />
+                <button onClick={doRefresh} disabled={refreshing} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'white', border: `1px solid ${C.border}`, borderRadius: 9, cursor: 'pointer', ...f(13, 600, C.sub) }}>
+                  <span style={{ display: 'flex', animation: refreshing ? 'gpsPulse 1s ease-in-out infinite' : 'none' }}><RefreshIcon /></span>
+                  Refresh
+                </button>
+              </div>
             </div>
-            {activePage === 'requests' && <DesktopRequests setPage={setPage} setActiveReq={setActiveReq} isOnline={isOnline} />}
-            {activePage === 'active' && activeReq && <DesktopActiveJob req={activeReq} setPage={setPage} />}
-            {activePage === 'earnings' && <DesktopEarnings />}
+            {pageContent()}
           </div>
         </main>
       </div>
@@ -465,22 +596,23 @@ export default function DriverPortal() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: C.bg }}>
-      <div style={{ background: C.primary, padding: '16px 20px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+      <style>{css}</style>
+      <div style={{ background: C.primary, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
         <div>
           <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 18, fontWeight: 700, color: 'white' }}>Smart<span style={{ color: C.accent }}>Shine</span></div>
-          <div style={f(11, 400, 'rgba(255,255,255,.5)')}>Driver Portal</div>
+          <div style={f(10, 400, 'rgba(255,255,255,.45)')}>Driver Portal</div>
         </div>
-        <button onClick={() => setIsOnline(o => !o)} style={{ display: 'flex', alignItems: 'center', gap: 7, background: isOnline ? 'rgba(34,197,94,.18)' : 'rgba(255,255,255,.1)', border: 'none', borderRadius: 20, padding: '7px 14px', cursor: 'pointer' }}>
-          <div style={{ width: 8, height: 8, borderRadius: '50%', background: isOnline ? C.success : C.dim }} />
-          <span style={f(12, 700, isOnline ? '#86EFAC' : 'rgba(255,255,255,.4)')}>{isOnline ? 'Online' : 'Offline'}</span>
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <GPSIndicator tracking={gpsTracking} />
+          <button onClick={doRefresh} disabled={refreshing} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,.1)', border: 'none', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', color: 'white', fontFamily: "'DM Sans',sans-serif", fontSize: 12, fontWeight: 600 }}>
+            <RefreshIcon /> Refresh
+          </button>
+        </div>
       </div>
-      <div style={{ flex: 1, overflowY: 'auto' }}>
-        {activePage === 'requests' && <MobileRequests setPage={setPage} setActiveReq={setActiveReq} isOnline={isOnline} />}
-        {activePage === 'active' && activeReq && <MobileActiveJob req={activeReq} setPage={setPage} />}
-        {activePage === 'earnings' && <MobileEarnings />}
+      <div style={{ flex: 1, overflowY: 'auto', padding: 16, paddingBottom: 80 }}>
+        {pageContent()}
       </div>
-      <BottomNav page={activePage} setPage={navigate} />
+      <BottomNav page={page} setPage={setPage} />
     </div>
   )
 }

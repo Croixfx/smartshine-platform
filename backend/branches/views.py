@@ -23,6 +23,9 @@ class BranchViewSet(viewsets.ModelViewSet):
             return BranchDetailSerializer
         return BranchSerializer
 
+    def get_serializer_context(self):
+        return {**super().get_serializer_context(), 'request': self.request}
+
     def get_permissions(self):
         if self.action in ('list', 'retrieve'):
             return [AllowAny()]

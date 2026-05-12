@@ -1,7 +1,10 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
-from accounts.views import RegisterView, OTPRequestView, OTPVerifyView, ProfileView, AdminUserListView, AdminUserDetailView
+from accounts.views import (
+    RegisterView, OTPRequestView, OTPVerifyView, ProfileView,
+    AdminUserListView, AdminUserDetailView, DriverLocationView, DriverListView,
+)
 from branches.views import BranchViewSet, ServiceTypeViewSet
 from vehicles.views import VehicleViewSet
 from bookings.views import BookingViewSet, AvailableSlotsView
@@ -19,6 +22,7 @@ router.register(r'notifications/sms-logs', SMSLogViewSet, basename='sms-log')
 urlpatterns = [
     # Explicit paths before router so they don't get swallowed by viewset lookups
     path('bookings/available-slots/', AvailableSlotsView.as_view(), name='available-slots'),
+    path('payments/initiate/', InitiatePaymentView.as_view(), name='payment-initiate'),
 
     # Router endpoints
     path('', include(router.urls)),
@@ -30,7 +34,6 @@ urlpatterns = [
     path('accounts/profile/', ProfileView.as_view(), name='profile'),
     path('accounts/users/', AdminUserListView.as_view(), name='admin-user-list'),
     path('accounts/users/<int:user_id>/', AdminUserDetailView.as_view(), name='admin-user-detail'),
-
-    # Payments (non-viewset)
-    path('payments/initiate/', InitiatePaymentView.as_view(), name='payment-initiate'),
+    path('accounts/drivers/', DriverListView.as_view(), name='driver-list'),
+    path('accounts/driver/location/', DriverLocationView.as_view(), name='driver-location'),
 ]
