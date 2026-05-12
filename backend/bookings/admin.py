@@ -4,6 +4,7 @@ from .models import Booking
 
 @admin.register(Booking)
 class BookingAdmin(admin.ModelAdmin):
+     # Fields displayed in the admin list view
     list_display = [
         'id', 'customer', 'branch', 'service', 'vehicle',
         'date', 'time_slot', 'status', 'payment_status', 'pickup_requested', 'created_at',
