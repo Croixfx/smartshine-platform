@@ -14,9 +14,11 @@ class Payment(models.Model):
 
     # Method
     MOMO = 'momo'
+    AIRTEL = 'airtel'
     CASH = 'cash'
     METHOD_CHOICES = [
         (MOMO, 'MTN MoMo'),
+        (AIRTEL, 'Airtel Money'),
         (CASH, 'Cash'),
     ]
 

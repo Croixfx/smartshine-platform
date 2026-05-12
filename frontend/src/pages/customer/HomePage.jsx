@@ -1,13 +1,95 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { MapContainer, TileLayer, Marker, Popup, CircleMarker } from 'react-leaflet'
+import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import '../../utils/leafletFix'
 import client from '../../api/client'
 
+const BACKEND = 'http://localhost:8000'
 const DEFAULT_CENTER = [-1.9441, 30.0619]
 
-function BranchCard({ branch, onClick }) {
+// ── Branch visual theming ─────────────────────────────────────────────────────
+
+function getBranchTheme(name = '', idx = 0) {
+  const n = name.toLowerCase()
+  if (n.includes('kicukiro'))   return { gradient: 'linear-gradient(135deg,#0D2137 0%,#1A5276 50%,#2980B9 100%)', pattern: 'car' }
+  if (n.includes('kimironko'))  return { gradient: 'linear-gradient(135deg,#0A3D2B 0%,#0E6655 55%,#1ABC9C 100%)', pattern: 'drops' }
+  if (n.includes('nyamirambo')) return { gradient: 'linear-gradient(135deg,#3B1F5E 0%,#6C3483 55%,#A569BD 100%)', pattern: 'sparkle' }
+  const themes = [
+    { gradient: 'linear-gradient(135deg,#0D2137 0%,#1A5276 50%,#2980B9 100%)', pattern: 'car' },
+    { gradient: 'linear-gradient(135deg,#0A3D2B 0%,#0E6655 55%,#1ABC9C 100%)', pattern: 'drops' },
+    { gradient: 'linear-gradient(135deg,#3B1F5E 0%,#6C3483 55%,#A569BD 100%)', pattern: 'sparkle' },
+  ]
+  return themes[idx % themes.length]
+}
+
+function BranchPattern({ type }) {
+  if (type === 'car') return (
+    <svg viewBox="0 0 300 120" preserveAspectRatio="xMidYMid slice"
+      style={{ position: 'absolute', bottom: 0, right: -10, height: '100%', opacity: 0.13 }}>
+      <path d="M80,95 L118,54 L148,42 L212,42 L242,54 L265,95 Z" fill="white"/>
+      <path d="M148,42 L163,22 L197,22 L212,42 Z" fill="white" opacity="0.7"/>
+      <circle cx="113" cy="95" r="17" fill="white"/>
+      <circle cx="247" cy="95" r="17" fill="white"/>
+      <rect x="155" y="46" width="50" height="12" rx="3" fill="white" opacity="0.4"/>
+    </svg>
+  )
+  if (type === 'drops') return (
+    <svg viewBox="0 0 300 120" preserveAspectRatio="xMidYMid slice"
+      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0.11 }}>
+      {[[45,85],[102,54],[162,80],[222,50],[278,78]].map(([cx, cy], i) => (
+        <path key={i} d={`M${cx},${cy-30} C${cx-17},${cy-15} ${cx-17},${cy+4} ${cx},${cy+14} C${cx+17},${cy+4} ${cx+17},${cy-15} ${cx},${cy-30}`} fill="white"/>
+      ))}
+    </svg>
+  )
+  if (type === 'sparkle') return (
+    <svg viewBox="0 0 300 120" preserveAspectRatio="xMidYMid slice"
+      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0.13 }}>
+      {[[35,28,12],[100,18,8],[168,34,14],[232,20,9],[278,42,11],[62,84,7],[148,76,10],[244,72,8]].map(([x, y, r], i) => (
+        <path key={i} d={`M${x},${y-r} L${x+r*.28},${y-r*.28} L${x+r},${y} L${x+r*.28},${y+r*.28} L${x},${y+r} L${x-r*.28},${y+r*.28} L${x-r},${y} L${x-r*.28},${y-r*.28}Z`} fill="white"/>
+      ))}
+    </svg>
+  )
+  return null
+}
+
+function BranchHeroArea({ branch, height = 180, idx = 0 }) {
+  const realImg = branch.image_url || (branch.image
+    ? (branch.image.startsWith('http') ? branch.image : `${BACKEND}${branch.image}`)
+    : null)
+  const theme = getBranchTheme(branch.name, idx)
+  return (
+    <div style={{ height, position: 'relative', overflow: 'hidden', borderRadius: '16px 16px 0 0', flexShrink: 0 }}>
+      {realImg ? (
+        <img src={realImg} alt={branch.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          onError={e => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement.style.background = theme.gradient }} />
+      ) : (
+        <div style={{ width: '100%', height: '100%', background: theme.gradient, position: 'relative' }}>
+          <BranchPattern type={theme.pattern} />
+        </div>
+      )}
+      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,.52) 0%, transparent 55%)' }} />
+      <div style={{ position: 'absolute', top: 10, right: 10 }}>
+        <span style={{
+          fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 9999,
+          background: branch.is_active ? 'rgba(220,252,231,.92)' : 'rgba(243,244,246,.92)',
+          color: branch.is_active ? '#15803D' : '#6B7280',
+        }}>
+          {branch.is_active ? 'Open' : 'Closed'}
+        </span>
+      </div>
+      <div style={{ position: 'absolute', bottom: 12, left: 14, right: 52 }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: 'white', textShadow: '0 1px 6px rgba(0,0,0,.35)', lineHeight: 1.3 }}>
+          {branch.name}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Branch card ───────────────────────────────────────────────────────────────
+
+function BranchCard({ branch, onClick, idx = 0 }) {
   const [hovered, setHovered] = useState(false)
   return (
     <button
@@ -16,30 +98,27 @@ function BranchCard({ branch, onClick }) {
       onMouseLeave={() => setHovered(false)}
       style={{
         background: 'white', borderRadius: 16,
-        boxShadow: hovered ? '0 4px 20px rgba(0,0,0,.08)' : '0 2px 12px rgba(0,0,0,.04)',
-        padding: 20, cursor: 'pointer', transition: 'box-shadow 200ms',
-        display: 'flex', flexDirection: 'column', gap: 8, textAlign: 'left',
+        boxShadow: hovered ? '0 4px 20px rgba(0,0,0,.1)' : '0 2px 12px rgba(0,0,0,.04)',
+        cursor: 'pointer', transition: 'box-shadow 200ms, transform 150ms',
+        transform: hovered ? 'translateY(-2px)' : 'none',
+        display: 'flex', flexDirection: 'column', textAlign: 'left',
         border: 'none', width: '100%', fontFamily: "'DM Sans',sans-serif",
+        padding: 0, overflow: 'hidden',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-        <div style={{ fontSize: 15, fontWeight: 700, color: hovered ? '#2E86C1' : '#1a1a2e', transition: 'color 150ms' }}>{branch.name}</div>
-        <span style={{
-          fontSize: 10, fontWeight: 600, padding: '2px 10px', borderRadius: 9999,
-          background: branch.is_active ? '#DCFCE7' : '#F3F4F6',
-          color: branch.is_active ? '#15803D' : '#6B7280', flexShrink: 0,
-        }}>
-          {branch.is_active ? 'Open' : 'Closed'}
-        </span>
-      </div>
-      <div style={{ fontSize: 13, color: '#888', lineHeight: 1.4 }}>{branch.address}</div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12, color: '#aaa', paddingTop: 4 }}>
-        <span>{branch.opening_time?.slice(0, 5)} - {branch.closing_time?.slice(0, 5)}</span>
-        <span style={{ fontSize: 12, fontWeight: 600, color: '#2E86C1' }}>View &rarr;</span>
+      <BranchHeroArea branch={branch} height={180} idx={idx} />
+      <div style={{ padding: '12px 16px 14px' }}>
+        <div style={{ fontSize: 13, color: '#777', lineHeight: 1.4, marginBottom: 8 }}>{branch.address}</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12, color: '#aaa' }}>
+          <span>🕐 {branch.opening_time?.slice(0, 5)} – {branch.closing_time?.slice(0, 5)}</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: hovered ? '#1A5276' : '#2E86C1', transition: 'color 150ms' }}>View →</span>
+        </div>
       </div>
     </button>
   )
 }
+
+// ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function HomePage() {
   const navigate = useNavigate()
@@ -80,14 +159,11 @@ export default function HomePage() {
           }}>
             Kigali's #1 Car Wash
           </div>
-          <div style={{
-            fontFamily: "'Playfair Display',serif", fontSize: 40, fontWeight: 800, color: 'white',
-            lineHeight: 1.15, marginBottom: 14, letterSpacing: '-0.02em',
-          }}>
+          <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 40, fontWeight: 800, color: 'white', lineHeight: 1.15, marginBottom: 14, letterSpacing: '-0.02em' }}>
             Find a Branch<br /><span style={{ color: '#F39C12' }}>Near You</span>
           </div>
           <p style={{ fontSize: 15, color: 'rgba(255,255,255,.7)', margin: '0 0 28px', maxWidth: 480, marginLeft: 'auto', marginRight: 'auto' }}>
-            Premium car wash services across Kigali - book in 2 minutes, pay with MoMo.
+            Premium car wash services across Kigali — book in 2 minutes, pay with MoMo.
           </p>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
             {[['4.8 rating', true], ['5 locations', false], ['Open 7 days', false]].map(([text, hasStar]) => (
@@ -96,7 +172,7 @@ export default function HomePage() {
                 borderRadius: 10, padding: '8px 18px', fontSize: 13, color: 'white',
                 display: 'flex', alignItems: 'center', gap: 6,
               }}>
-                {hasStar && <span style={{ color: '#F39C12' }}>&#9733;</span>}
+                {hasStar && <span style={{ color: '#F39C12' }}>★</span>}
                 {text}
               </div>
             ))}
@@ -120,20 +196,14 @@ export default function HomePage() {
                   key={b.id}
                   center={[parseFloat(b.latitude), parseFloat(b.longitude)]}
                   radius={12}
-                  pathOptions={{
-                    fillColor: b.is_active ? '#1A5276' : '#9ca3af',
-                    fillOpacity: 0.9, color: 'white', weight: 2,
-                  }}
+                  pathOptions={{ fillColor: b.is_active ? '#1A5276' : '#9ca3af', fillOpacity: 0.9, color: 'white', weight: 2 }}
                   eventHandlers={{ click: () => navigate(`/branches/${b.id}`) }}
                 >
                   <Popup>
                     <strong>{b.name}</strong><br />
                     {b.address}<br />
-                    <span
-                      onClick={() => navigate(`/branches/${b.id}`)}
-                      style={{ color: '#2E86C1', cursor: 'pointer', fontSize: 12 }}
-                    >
-                      View details &rarr;
+                    <span onClick={() => navigate(`/branches/${b.id}`)} style={{ color: '#2E86C1', cursor: 'pointer', fontSize: 12 }}>
+                      View details →
                     </span>
                   </Popup>
                 </CircleMarker>
@@ -161,10 +231,12 @@ export default function HomePage() {
           {loading && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: 14 }}>
               {[1, 2, 3].map(i => (
-                <div key={i} style={{ background: 'white', borderRadius: 16, padding: 20, boxShadow: '0 2px 12px rgba(0,0,0,.04)' }}>
-                  <div style={{ height: 16, background: '#E9ECEF', borderRadius: 8, width: '60%', marginBottom: 12 }} />
-                  <div style={{ height: 12, background: '#E9ECEF', borderRadius: 6, width: '100%', marginBottom: 8 }} />
-                  <div style={{ height: 12, background: '#E9ECEF', borderRadius: 6, width: '50%' }} />
+                <div key={i} style={{ background: 'white', borderRadius: 16, overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,.04)' }}>
+                  <div style={{ height: 180, background: '#E9ECEF' }} />
+                  <div style={{ padding: 16 }}>
+                    <div style={{ height: 12, background: '#E9ECEF', borderRadius: 6, width: '100%', marginBottom: 8 }} />
+                    <div style={{ height: 10, background: '#E9ECEF', borderRadius: 5, width: '50%' }} />
+                  </div>
                 </div>
               ))}
             </div>
@@ -174,8 +246,8 @@ export default function HomePage() {
 
           {!loading && !error && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: 14 }}>
-              {filtered.map(b => (
-                <BranchCard key={b.id} branch={b} onClick={() => navigate(`/branches/${b.id}`)} />
+              {filtered.map((b, i) => (
+                <BranchCard key={b.id} branch={b} idx={i} onClick={() => navigate(`/branches/${b.id}`)} />
               ))}
             </div>
           )}
@@ -217,7 +289,7 @@ export default function HomePage() {
               Ready for a spotless car?
             </div>
             <div style={{ fontSize: 14, color: 'rgba(255,255,255,.7)' }}>
-              Book your wash now - slots filling fast this weekend.
+              Book your wash now — slots filling fast this weekend.
             </div>
           </div>
           <button
@@ -225,11 +297,10 @@ export default function HomePage() {
             style={{
               background: '#F39C12', color: '#1a1a2e', fontSize: 14, fontWeight: 700,
               padding: '13px 28px', borderRadius: 12, border: 'none', cursor: 'pointer',
-              fontFamily: "'DM Sans',sans-serif", boxShadow: '0 4px 16px rgba(243,156,18,.3)',
-              flexShrink: 0,
+              fontFamily: "'DM Sans',sans-serif", boxShadow: '0 4px 16px rgba(243,156,18,.3)', flexShrink: 0,
             }}
           >
-            Book Now &rarr;
+            Book Now →
           </button>
         </div>
       </div>

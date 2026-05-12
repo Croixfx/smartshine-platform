@@ -176,3 +176,43 @@ class AdminUserDetailView(APIView):
             return Response({'detail': 'Cannot delete your own account.'}, status=status.HTTP_400_BAD_REQUEST)
         target_user.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class DriverLocationView(APIView):
+    """PATCH — driver updates their live GPS coordinates."""
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request):
+        user = request.user
+        if user.role != 'driver':
+            return Response({'detail': 'Only drivers can update location.'}, status=status.HTTP_403_FORBIDDEN)
+
+        lat = request.data.get('latitude')
+        lon = request.data.get('longitude')
+        if lat is None or lon is None:
+            return Response({'detail': 'latitude and longitude are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        from .models import DriverProfile
+        from django.utils import timezone as tz
+        profile, _ = DriverProfile.objects.get_or_create(user=user)
+        profile.current_latitude     = lat
+        profile.current_longitude    = lon
+        profile.last_location_update = tz.now()
+        profile.save()
+        return Response({'status': 'location updated'})
+
+
+class DriverListView(generics.ListAPIView):
+    """GET — admin fetches list of all drivers (for assignment UI)."""
+    serializer_class = AdminUserSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        if self.request.user.role != 'admin':
+            return User.objects.none()
+        return User.objects.filter(role='driver').order_by('full_name')
+
+    def list(self, request, *args, **kwargs):
+        if request.user.role != 'admin':
+            return Response({'detail': 'Admin access required.'}, status=status.HTTP_403_FORBIDDEN)
+        return super().list(request, *args, **kwargs)

@@ -1,6 +1,30 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 import client from '../../api/client'
+
+// Fix default marker icons broken by bundlers
+delete L.Icon.Default.prototype._getIconUrl
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl:       'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl:     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+})
+
+function MapClickHandler({ onMapClick }) {
+  useMapEvents({ click: e => onMapClick(e.latlng) })
+  return null
+}
+
+function ChangeView({ lat, lng }) {
+  const map = useMap()
+  useEffect(() => {
+    if (lat != null && lng != null) map.setView([lat, lng], 16)
+  }, [lat, lng, map])
+  return null
+}
 
 const cardS = { background: 'white', borderRadius: 16, boxShadow: '0 2px 12px rgba(0,0,0,.04)', padding: 20, marginBottom: 16 }
 const inp = { width: '100%', background: '#fafbfc', border: '1.5px solid #E9ECEF', borderRadius: 10, padding: '10px 14px', fontSize: 14, fontFamily: "'DM Sans',sans-serif", color: '#1a1a2e', outline: 'none', boxSizing: 'border-box' }
@@ -60,6 +84,12 @@ export default function BookingFlowPage() {
   const [slots, setSlots] = useState([])
   const [slotsLoading, setSlotsLoading] = useState(false)
   const [submitLoading, setSubmitLoading] = useState(false)
+  const [serviceType, setServiceType]     = useState('station')
+  const [pickupAddress, setPickupAddress] = useState('')
+  const [pickupLat, setPickupLat]         = useState(null)
+  const [pickupLng, setPickupLng]         = useState(null)
+  const [mapCenter, setMapCenter]         = useState([-1.9441, 30.0619])
+  const [gettingLocation, setGettingLocation] = useState(false)
 
   useEffect(() => {
     const load = async () => {
@@ -135,7 +165,45 @@ export default function BookingFlowPage() {
     } catch { /* ignore */ }
   }
 
-  const handleSubmit = async () => {
+  const reverseGeocode = async (lat, lng) => {
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=en`)
+      const d = await res.json()
+      return d.display_name || `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+    } catch {
+      return `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+    }
+  }
+
+  const useMyLocation = () => {
+    if (!navigator.geolocation) { alert('Geolocation is not supported by your browser.'); return }
+    setGettingLocation(true)
+    navigator.geolocation.getCurrentPosition(
+      async pos => {
+        const { latitude, longitude } = pos.coords
+        setPickupLat(latitude)
+        setPickupLng(longitude)
+        setMapCenter([latitude, longitude])
+        const addr = await reverseGeocode(latitude, longitude)
+        setPickupAddress(addr)
+        setGettingLocation(false)
+      },
+      () => {
+        setGettingLocation(false)
+        alert('Could not get your location. Please click the map or type your address.')
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    )
+  }
+
+  const handleMapClick = async latlng => {
+    setPickupLat(latlng.lat)
+    setPickupLng(latlng.lng)
+    const addr = await reverseGeocode(latlng.lat, latlng.lng)
+    setPickupAddress(addr)
+  }
+
+  const handleSubmit = async (payNow = true) => {
     if (!selectedVehicle || !selectedDate || !selectedTime) return
     setSubmitLoading(true)
     try {
@@ -146,9 +214,14 @@ export default function BookingFlowPage() {
         vehicle: selectedVehicle.id,
         date: dateStr,
         time_slot: `${selectedTime}:00`,
+        service_type: serviceType,
+        pickup_requested: serviceType === 'pickup',
+        pickup_address:   serviceType === 'pickup' ? pickupAddress : '',
+        pickup_latitude:  serviceType === 'pickup' ? pickupLat : null,
+        pickup_longitude: serviceType === 'pickup' ? pickupLng : null,
       })
-      navigate('/payment', {
-        state: {
+      if (payNow) {
+        const pendingPayment = {
           booking,
           service,
           branch,
@@ -156,8 +229,12 @@ export default function BookingFlowPage() {
           date: formattedDate,
           time: selectedTime,
           dueNow: deposit,
-        },
-      })
+        }
+        localStorage.setItem('smartshine_pending_payment', JSON.stringify(pendingPayment))
+        navigate('/payment', { state: pendingPayment })
+      } else {
+        navigate('/bookings')
+      }
     } catch (err) {
       const msg = err.response?.data?.detail || 'Could not create booking. Please try again.'
       window.alert(msg)
@@ -167,7 +244,7 @@ export default function BookingFlowPage() {
   }
 
   const canNext = () => {
-    if (step === 1) return true
+    if (step === 1) return serviceType === 'station' || pickupAddress.trim().length > 3
     if (step === 2) return !!selectedVehicle
     if (step === 3) return !!selectedDate && !!selectedTime
     return true
@@ -202,6 +279,72 @@ export default function BookingFlowPage() {
               </div>
               {service.description && <div style={{ background: '#F8F9FA', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: '#555' }}>{service.description}</div>}
             </div>
+
+            {/* Service type selector */}
+            <div style={cardS}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: '#888', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 12 }}>How would you like to drop off your car?</div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                {[
+                  { id: 'station', icon: '🏪', title: 'Drop off at Branch', desc: 'Bring your car to SmartShine' },
+                  { id: 'pickup',  icon: '🚗', title: 'We Pick Up & Return', desc: 'Driver comes to your location' },
+                ].map(opt => (
+                  <button
+                    key={opt.id}
+                    onClick={() => setServiceType(opt.id)}
+                    style={{
+                      flex: 1, padding: '14px 12px', borderRadius: 12, textAlign: 'left', cursor: 'pointer',
+                      border: `2px solid ${serviceType === opt.id ? '#1A5276' : '#E9ECEF'}`,
+                      background: serviceType === opt.id ? '#EFF6FF' : 'white',
+                      fontFamily: "'DM Sans',sans-serif", transition: 'all 150ms',
+                    }}
+                  >
+                    <div style={{ fontSize: 22, marginBottom: 6 }}>{opt.icon}</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: serviceType === opt.id ? '#1A5276' : '#1a1a2e', marginBottom: 3 }}>{opt.title}</div>
+                    <div style={{ fontSize: 11, color: '#888' }}>{opt.desc}</div>
+                  </button>
+                ))}
+              </div>
+              {serviceType === 'pickup' && (
+                <div style={{ marginTop: 16 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#555', display: 'block', marginBottom: 8 }}>Your Pickup Location</label>
+                  <button
+                    onClick={useMyLocation}
+                    disabled={gettingLocation}
+                    style={{
+                      width: '100%', padding: '11px 14px', borderRadius: 10, marginBottom: 10,
+                      background: gettingLocation ? '#F3F4F6' : '#EFF6FF',
+                      border: '1.5px solid #2E86C1', color: '#1A5276',
+                      fontSize: 13, fontWeight: 600, cursor: gettingLocation ? 'not-allowed' : 'pointer',
+                      fontFamily: "'DM Sans',sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                    }}
+                  >
+                    <span>📍</span>
+                    {gettingLocation ? 'Detecting location...' : 'Use My Current Location'}
+                  </button>
+                  <div style={{ height: 220, borderRadius: 12, overflow: 'hidden', border: '1.5px solid #E9ECEF', marginBottom: 10 }}>
+                    <MapContainer center={mapCenter} zoom={14} style={{ height: '100%', width: '100%' }}>
+                      <TileLayer
+                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                      />
+                      <ChangeView lat={pickupLat} lng={pickupLng} />
+                      <MapClickHandler onMapClick={handleMapClick} />
+                      {pickupLat !== null && <Marker position={[pickupLat, pickupLng]} />}
+                    </MapContainer>
+                  </div>
+                  <input
+                    value={pickupAddress}
+                    onChange={e => setPickupAddress(e.target.value)}
+                    style={{ ...inp }}
+                    placeholder="Click map to set location, or type address here..."
+                  />
+                  <p style={{ fontSize: 11, color: '#aaa', margin: '6px 0 0' }}>
+                    Click the map to pin your exact location, or use the button above. A driver will be dispatched to this address.
+                  </p>
+                </div>
+              )}
+            </div>
+
             <div style={cardS}>
               <div style={{ fontSize: 11, fontWeight: 600, color: '#888', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 12 }}>Service Details</div>
               {[['Category', service.category_display || service.category], ['Duration', `${service.duration_minutes} minutes`], ['Branch', branch.name], ['Hours', `${branch.opening_time?.slice(0, 5)} - ${branch.closing_time?.slice(0, 5)}`]].map(([k, v]) => (
@@ -357,11 +500,13 @@ export default function BookingFlowPage() {
               <div style={{ fontSize: 11, fontWeight: 600, color: '#888', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 14 }}>Booking Summary</div>
               {[
                 ['Service', service.name],
+                ['Type', serviceType === 'pickup' ? '🚗 Pickup & Delivery' : '🏪 Station Drop-off'],
                 ['Branch', branch.name],
                 ['Vehicle', `${selectedVehicle?.plate_number} - ${selectedVehicle?.make} ${selectedVehicle?.model}`],
                 ['Date', formattedDate],
                 ['Time', selectedTime || '-'],
                 ['Duration', `${service.duration_minutes} min`],
+                ...(serviceType === 'pickup' && pickupAddress ? [['Pickup Address', pickupAddress]] : []),
               ].map(([k, v]) => (
                 <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '8px 0', borderBottom: '1px solid #F9FAFB' }}>
                   <span style={{ color: '#888' }}>{k}</span><span style={{ fontWeight: 500, color: '#1a1a2e', textAlign: 'right', maxWidth: '60%' }}>{v}</span>
@@ -383,30 +528,64 @@ export default function BookingFlowPage() {
                 <span>Due now</span><span>RWF {deposit.toLocaleString()}</span>
               </div>
               <div style={{ background: '#FEF9EE', borderRadius: 10, padding: '10px 12px', fontSize: 12, color: '#92400E', marginTop: 10 }}>
-                Pay 30% deposit now to confirm. Remaining balance is collected at the branch.
+                You can pay the 30% deposit now, or book and pay later from My Bookings.
               </div>
             </div>
           </>
         )}
 
-        <button
-          onClick={() => {
-            if (step < 4) setStep(s => s + 1)
-            else handleSubmit()
-          }}
-          disabled={!canNext() || submitLoading}
-          style={{
-            width: '100%',
-            background: canNext() ? (step === 4 ? '#F39C12' : '#1A5276') : '#E9ECEF',
-            color: canNext() ? (step === 4 ? '#1a1a2e' : 'white') : '#AAA',
-            fontSize: 15, fontWeight: 700, padding: 14, borderRadius: 12, border: 'none',
-            cursor: canNext() ? 'pointer' : 'not-allowed', fontFamily: "'DM Sans',sans-serif",
-            boxShadow: canNext() && step === 4 ? '0 4px 16px rgba(243,156,18,.25)' : 'none',
-            transition: 'all 150ms', marginTop: 8,
-          }}
-        >
-          {submitLoading ? 'Submitting...' : step < 4 ? 'Continue →' : 'Proceed to Payment →'}
-        </button>
+        {step < 4 ? (
+          <button
+            onClick={() => setStep(s => s + 1)}
+            disabled={!canNext()}
+            style={{
+              width: '100%',
+              background: canNext() ? '#1A5276' : '#E9ECEF',
+              color: canNext() ? 'white' : '#AAA',
+              fontSize: 15, fontWeight: 700, padding: 14, borderRadius: 12, border: 'none',
+              cursor: canNext() ? 'pointer' : 'not-allowed', fontFamily: "'DM Sans',sans-serif",
+              transition: 'all 150ms', marginTop: 8,
+            }}
+          >
+            Continue →
+          </button>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
+            {/* Primary: pay now */}
+            <button
+              onClick={() => handleSubmit(true)}
+              disabled={submitLoading}
+              style={{
+                width: '100%', background: '#F39C12', color: '#1a1a2e',
+                fontSize: 15, fontWeight: 700, padding: 14, borderRadius: 12, border: 'none',
+                cursor: submitLoading ? 'not-allowed' : 'pointer', fontFamily: "'DM Sans',sans-serif",
+                boxShadow: '0 4px 16px rgba(243,156,18,.28)', opacity: submitLoading ? 0.7 : 1,
+                transition: 'all 150ms',
+              }}
+            >
+              {submitLoading ? 'Creating booking...' : `Pay Deposit Now — RWF ${deposit.toLocaleString()} →`}
+            </button>
+
+            {/* Secondary: pay later */}
+            <button
+              onClick={() => handleSubmit(false)}
+              disabled={submitLoading}
+              style={{
+                width: '100%', background: 'white', color: '#1A5276',
+                fontSize: 14, fontWeight: 600, padding: '12px 14px', borderRadius: 12,
+                border: '1.5px solid #CBD5E1',
+                cursor: submitLoading ? 'not-allowed' : 'pointer', fontFamily: "'DM Sans',sans-serif",
+                opacity: submitLoading ? 0.6 : 1, transition: 'all 150ms',
+              }}
+            >
+              Book Now, Pay Later
+            </button>
+
+            <p style={{ textAlign: 'center', fontSize: 11, color: '#aaa', margin: 0 }}>
+              "Pay Later" saves your booking — you can pay the deposit from My Bookings anytime.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   )

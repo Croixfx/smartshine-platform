@@ -11,6 +11,7 @@ class Branch(models.Model):
     opening_time = models.TimeField()
     closing_time = models.TimeField()
     image = models.ImageField(upload_to='branches/', blank=True, null=True)
+    image_url = models.URLField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
