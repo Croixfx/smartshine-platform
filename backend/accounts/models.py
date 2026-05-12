@@ -62,3 +62,19 @@ class OTPCode(models.Model):
 
     def __str__(self):
         return f'OTP {self.code} → {self.phone} (used={self.is_used})'
+
+
+class DriverProfile(models.Model):
+    user = models.OneToOneField(
+        CustomUser, on_delete=models.CASCADE,
+        related_name='driver_profile', limit_choices_to={'role': 'driver'},
+    )
+    license_number       = models.CharField(max_length=50, blank=True)
+    vehicle_info         = models.CharField(max_length=200, blank=True)
+    is_available         = models.BooleanField(default=True)
+    current_latitude     = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    current_longitude    = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    last_location_update = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f'DriverProfile({self.user.phone})'
